@@ -1,0 +1,431 @@
+{
+  "name": "Chemistry Question Generation Platform",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "tags": [
+    { "name": "Chemistry" },
+    { "name": "CBSE" },
+    { "name": "Question Bank" }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Single workflow that ingests a chapter PDF, structures its knowledge, dynamically selects one of 18 prompt templates by (question_type x difficulty), generates questions with an LLM, validates them, removes duplicates against the existing bank, and stores the final JSON in a Board/Class/Chapter/Type/Difficulty folder tree on Google Drive."
+  },
+
+  "nodes": [
+    {
+      "id": "node_form_trigger",
+      "name": "Form: User Input",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [-1600, 0],
+      "parameters": {
+        "formTitle": "Chemistry Question Generator",
+        "formDescription": "Generate a CBSE Chemistry question bank from a chapter PDF.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Board", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "CBSE" } ] } },
+            { "fieldLabel": "Class", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "Class XI" }, { "option": "Class XII" } ] } },
+            { "fieldLabel": "Chapter Name", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "Some Basic Concepts of Chemistry" },
+                { "option": "Structure of Atom" },
+                { "option": "Thermodynamics" },
+                { "option": "Equilibrium" },
+                { "option": "Redox Reactions" },
+                { "option": "Hydrocarbons" },
+                { "option": "Solutions" },
+                { "option": "Electrochemistry" },
+                { "option": "Chemical Kinetics" },
+                { "option": "Coordination Compounds" },
+                { "option": "Haloalkanes and Haloarenes" },
+                { "option": "Alcohols, Phenols and Ethers" },
+                { "option": "Aldehydes, Ketones and Carboxylic Acids" },
+                { "option": "Amines" },
+                { "option": "Biomolecules" }
+              ] } },
+            { "fieldLabel": "Source Type", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "NCERT" }, { "option": "Reference Book" }, { "option": "Teacher Notes" },
+                { "option": "PYQ Collection" }, { "option": "Mixed" } ] } },
+            { "fieldLabel": "Reference PDF", "fieldType": "file", "requiredField": true,
+              "acceptFileTypes": ".pdf", "multipleFiles": false },
+            { "fieldLabel": "Question Type", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "MCQ" }, { "option": "VSA" }, { "option": "SA" },
+                { "option": "LA" }, { "option": "AR" }, { "option": "CASE_STUDY" } ] } },
+            { "fieldLabel": "Difficulty", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "EASY" }, { "option": "MEDIUM" }, { "option": "HARD" } ] } },
+            { "fieldLabel": "Number of Questions", "fieldType": "number", "requiredField": false },
+            { "fieldLabel": "Include Visual Questions", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "NO" }, { "option": "YES" } ] } },
+            { "fieldLabel": "Language", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "English" } ] } },
+            { "fieldLabel": "Generate Explanation", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "YES" }, { "option": "NO" } ] } }
+          ]
+        },
+        "options": { "respondWith": "showText", "formSubmittedText": "Generation started. You'll find the JSON in Google Drive when done." }
+      }
+    },
+
+    {
+      "id": "node_normalize_input",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1380, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const f = $input.first().json;\nconst num = parseInt(f['Number of Questions'], 10);\nconst batchId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);\nconst chapterCode = (f['Chapter Name'] || 'CHP').toUpperCase().replace(/[^A-Z0-9]+/g,'_').slice(0,12);\nconst diffCode = ({EASY:'E', MEDIUM:'M', HARD:'H'})[f['Difficulty']] || 'M';\nreturn [{ json: {\n  board: f['Board'],\n  class_name: f['Class'],\n  chapter: f['Chapter Name'],\n  source_type: f['Source Type'],\n  question_type: f['Question Type'],\n  difficulty: f['Difficulty'],\n  number_of_questions: Number.isFinite(num) && num > 0 ? num : 10,\n  include_visual_questions: (f['Include Visual Questions'] || 'NO').toUpperCase() === 'YES',\n  language: f['Language'] || 'English',\n  generate_explanation: (f['Generate Explanation'] || 'YES').toUpperCase() === 'YES',\n  prompt_key: `${f['Question Type']}_${f['Difficulty']}`,\n  chapter_code: chapterCode,\n  difficulty_code: diffCode,\n  batch_id: batchId,\n  started_at: new Date().toISOString()\n}, binary: $input.first().binary }];"
+      }
+    },
+
+    {
+      "id": "node_extract_pdf",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [-1160, 0],
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Reference_PDF",
+        "options": { "joinPages": true }
+      }
+    },
+
+    {
+      "id": "node_clean_text",
+      "name": "Clean PDF Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-940, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const raw = ($json.text || '').toString();\n// 1) Strip page numbers like 'Page 12 of 40' or standalone numeric lines\nlet t = raw.replace(/Page\\s+\\d+\\s+of\\s+\\d+/gi, '');\nt = t.split('\\n').filter(l => !/^\\s*\\d{1,3}\\s*$/.test(l)).join('\\n');\n// 2) Strip repeated headers/footers (lines appearing >5 times)\nconst freq = new Map();\nt.split('\\n').forEach(l => { const k=l.trim(); if(k.length>0 && k.length<80) freq.set(k,(freq.get(k)||0)+1); });\nconst headers = new Set([...freq].filter(([,c]) => c > 5).map(([k]) => k));\nt = t.split('\\n').filter(l => !headers.has(l.trim())).join('\\n');\n// 3) Fix common OCR artefacts\nt = t.replace(/-\\n(\\w)/g, '$1');             // de-hyphenate line breaks\nt = t.replace(/[ \\t]{2,}/g, ' ');\nt = t.replace(/\\n{3,}/g, '\\n\\n');\nt = t.replace(/[\\u0000-\\u001F\\u007F]/g, ' ');\n// 4) Drop obvious URL/email tracker lines\nt = t.split('\\n').filter(l => !/^(https?:|www\\.|email:)/i.test(l.trim())).join('\\n');\n// 5) Collapse duplicate adjacent paragraphs\nconst paras = t.split(/\\n\\n+/);\nconst dedup = [];\nfor (const p of paras) { if (dedup[dedup.length-1] !== p) dedup.push(p); }\nreturn [{ json: { ...$('Normalize Input').first().json, cleaned_text: dedup.join('\\n\\n').trim() } }];"
+      }
+    },
+
+    {
+      "id": "node_structure_knowledge",
+      "name": "Structure Chapter Knowledge",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1,
+      "position": [-720, 0],
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "modelId": "claude-haiku-4-5-20251001",
+        "system": "={{ $vars.STRUCTURER_PROMPT }}",
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=Chapter: {{$json.chapter}}\nClass: {{$json.class_name}}\nBoard: {{$json.board}}\nSource type: {{$json.source_type}}\n\nRAW CLEANED CHAPTER TEXT:\n{{$json.cleaned_text}}"
+            }
+          ]
+        },
+        "options": { "maxTokensToSample": 4000, "temperature": 0 }
+      }
+    },
+
+    {
+      "id": "node_attach_knowledge",
+      "name": "Attach Knowledge Object",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-500, 0],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $('Clean PDF Text').first().json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet knowledge;\ntry { knowledge = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Structurer did not return JSON: ' + e.message); }\nreturn [{ json: { ...ctx, chapter_knowledge: knowledge } }];"
+      }
+    },
+
+    {
+      "id": "node_load_existing_bank",
+      "name": "Load Existing Question Bank",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-280, 160],
+      "parameters": {
+        "operation": "list",
+        "filter": {
+          "folderId": { "__rl": true, "value": "={{ $('Ensure Drive Folders').item.json.target_folder_id }}", "mode": "id" }
+        },
+        "options": { "fields": "files(id,name)" }
+      },
+      "continueOnFail": true,
+      "notes": "Lists files inside the target folder so the duplicate-detector can fetch recent question stems. Runs AFTER folders are ensured (see connection ordering)."
+    },
+
+    {
+      "id": "node_build_prompt",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, -160],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst templates = $vars.PROMPT_TEMPLATES;   // injected via n8n environment variable (JSON string)\nconst tpl = typeof templates === 'string' ? JSON.parse(templates) : templates;\nconst key = ctx.prompt_key;\nconst entry = tpl[key];\nif (!entry) throw new Error('No prompt template for key ' + key);\n\nconst footer = tpl._meta.shared_footer\n  .replaceAll('{{number_of_questions}}', String(ctx.number_of_questions))\n  .replaceAll('{{chapter_code}}', ctx.chapter_code)\n  .replaceAll('{{existing_question_stems}}', JSON.stringify(ctx.existing_stems || []));\n\nconst body = [\n  entry.instruction,\n  'Rules:\\n- ' + entry.rules.join('\\n- '),\n  '',\n  'Context:',\n  `board=${ctx.board}`,\n  `class=${ctx.class_name}`,\n  `chapter=${ctx.chapter}`,\n  `source_type=${ctx.source_type}`,\n  `language=${ctx.language}`,\n  `include_visual_questions=${ctx.include_visual_questions}`,\n  `generate_explanation=${ctx.generate_explanation}`,\n  `batch_id=${ctx.batch_id}`,\n  '',\n  'CHAPTER KNOWLEDGE (use ONLY this):',\n  JSON.stringify(ctx.chapter_knowledge),\n  '',\n  footer\n].join('\\n')\n .replaceAll('{{board}}', ctx.board)\n .replaceAll('{{class}}', ctx.class_name)\n .replaceAll('{{chapter}}', ctx.chapter)\n .replaceAll('{{source_type}}', ctx.source_type)\n .replaceAll('{{language}}', ctx.language)\n .replaceAll('{{include_visual_questions}}', String(ctx.include_visual_questions))\n .replaceAll('{{generate_explanation}}', String(ctx.generate_explanation));\n\nreturn [{ json: { ...ctx, prompt_user_message: body, attempt: (ctx.attempt || 0) + 1 } }];"
+      }
+    },
+
+    {
+      "id": "node_generate_questions",
+      "name": "AI: Generate Questions",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1,
+      "position": [-60, -160],
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "modelId": "claude-sonnet-4-6",
+        "system": "={{ $vars.GENERATOR_SYSTEM_PROMPT }}",
+        "messages": {
+          "values": [
+            { "role": "user", "content": "={{ $json.prompt_user_message }}" }
+          ]
+        },
+        "options": { "maxTokensToSample": 8000, "temperature": 0.4 }
+      }
+    },
+
+    {
+      "id": "node_parse_generation",
+      "name": "Parse Generation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, -160],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $('Build Prompt').item.json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet parsed;\ntry { parsed = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Generator returned non-JSON: ' + e.message); }\nconst questions = Array.isArray(parsed.questions) ? parsed.questions : [];\nif (!questions.length) throw new Error('Generator returned 0 questions');\nreturn [{ json: { ...ctx, generated_questions: questions } }];"
+      }
+    },
+
+    {
+      "id": "node_validate_questions",
+      "name": "AI: Validate Questions",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1,
+      "position": [380, -160],
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "modelId": "claude-haiku-4-5-20251001",
+        "system": "={{ $vars.VALIDATOR_PROMPT }}",
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=expected_question_type: {{$json.question_type}}\nexpected_difficulty: {{$json.difficulty}}\n\nchapter_knowledge:\n{{ JSON.stringify($json.chapter_knowledge) }}\n\nquestions:\n{{ JSON.stringify($json.generated_questions) }}"
+            }
+          ]
+        },
+        "options": { "maxTokensToSample": 4000, "temperature": 0 }
+      }
+    },
+
+    {
+      "id": "node_filter_valid",
+      "name": "Filter Valid Questions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, -160],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $('Parse Generation').item.json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet verdict;\ntry { verdict = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Validator returned non-JSON: ' + e.message); }\nconst byId = new Map((verdict.results||[]).map(r => [r.question_id, r]));\nconst keep = ctx.generated_questions.filter(q => byId.get(q.question_id)?.valid === true);\nconst rejected = ctx.generated_questions\n  .filter(q => byId.get(q.question_id)?.valid !== true)\n  .map(q => ({ id: q.question_id, issues: byId.get(q.question_id)?.issues || ['unknown'] }));\nreturn [{ json: { ...ctx, validated_questions: keep, rejected, validator_verdict: verdict } }];"
+      }
+    },
+
+    {
+      "id": "node_dedupe",
+      "name": "Deduplicate vs Bank",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [820, -160],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst existing = (ctx.existing_stems || []).map(s => s.toLowerCase().replace(/\\s+/g,' ').trim());\nconst seen = new Set();\nconst norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\\s+/g,' ').trim();\nfunction trigrams(s){ const t=norm(s); const g=new Set(); for(let i=0;i<=t.length-3;i++) g.add(t.slice(i,i+3)); return g; }\nfunction jaccard(a,b){ const A=trigrams(a), B=trigrams(b); if(!A.size||!B.size) return 0; let inter=0; for(const x of A) if(B.has(x)) inter++; return inter/(A.size+B.size-inter); }\nconst threshold = 0.85;\nconst unique = [];\nconst dropped = [];\nfor (const q of (ctx.validated_questions||[])) {\n  const stem = q.question || q.passage || '';\n  const nstem = norm(stem);\n  if (seen.has(nstem)) { dropped.push({id:q.question_id, reason:'duplicate_in_batch'}); continue; }\n  let dup = false;\n  for (const e of existing) { if (jaccard(stem, e) >= threshold) { dup = true; break; } }\n  if (dup) { dropped.push({id:q.question_id, reason:'duplicate_vs_bank'}); continue; }\n  seen.add(nstem);\n  unique.push(q);\n}\nreturn [{ json: { ...ctx, unique_questions: unique, dropped_duplicates: dropped } }];"
+      }
+    },
+
+    {
+      "id": "node_should_regen",
+      "name": "Need Regeneration?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, -160],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            { "id": "c1", "operator": { "type": "number", "operation": "lt" },
+              "leftValue": "={{ ($json.unique_questions || []).length }}",
+              "rightValue": "={{ $json.number_of_questions }}" },
+            { "id": "c2", "operator": { "type": "number", "operation": "lt" },
+              "leftValue": "={{ $json.attempt }}",
+              "rightValue": "={{ $vars.MAX_REGEN_ATTEMPTS }}" }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "node_prepare_regen",
+      "name": "Prepare Regeneration Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 60],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst remaining = ctx.number_of_questions - (ctx.unique_questions||[]).length;\nconst existing_stems = [...(ctx.existing_stems||[]), ...(ctx.unique_questions||[]).map(q=>q.question||q.passage||'')];\nreturn [{ json: { ...ctx, number_of_questions: remaining, existing_stems, kept_questions: ctx.unique_questions } }];"
+      }
+    },
+
+    {
+      "id": "node_finalize",
+      "name": "Finalize JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1260, -260],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst all = [...(ctx.kept_questions||[]), ...(ctx.unique_questions||[])];\n// Re-id sequentially to keep ids tidy.\nconst diff = ctx.difficulty_code;\nconst tcode = ctx.question_type === 'CASE_STUDY' ? 'CS' : ctx.question_type;\nconst seen = new Set();\nconst questions = [];\nlet i = 1;\nfor (const q of all) {\n  const key = (q.question || q.passage || '').toLowerCase().replace(/\\s+/g,' ').trim();\n  if (seen.has(key)) continue; seen.add(key);\n  q.question_id = `${ctx.chapter_code}_${tcode}_${diff}_${String(i).padStart(3,'0')}`;\n  i++; questions.push(q);\n}\nconst out = {\n  board: ctx.board,\n  class: ctx.class_name,\n  chapter: ctx.chapter,\n  source_type: ctx.source_type,\n  question_type: ctx.question_type,\n  difficulty: ctx.difficulty,\n  language: ctx.language,\n  include_visual_questions: ctx.include_visual_questions,\n  generate_explanation: ctx.generate_explanation,\n  question_count: questions.length,\n  generated_at: new Date().toISOString(),\n  batch_id: ctx.batch_id,\n  questions\n};\nconst fname = `${ctx.chapter.replace(/[^A-Za-z0-9]+/g,'_')}_${ctx.question_type}_${ctx.difficulty}_${ctx.batch_id}.json`;\nreturn [{ json: { ...ctx, final_payload: out, file_name: fname } }];"
+      }
+    },
+
+    {
+      "id": "node_ensure_folders",
+      "name": "Ensure Drive Folders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-500, 200],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Resolves Board / Class / Chapter / Type / Difficulty folder ids under root 'Question Bank',\n// creating any missing folders via the Google Drive API using the OAuth credential\n// configured at workflow level via $vars.GOOGLE_DRIVE_OAUTH_TOKEN (refreshed by sub-workflow).\n// In practice, prefer the 'Google Drive: Folder' sub-workflow node — this Code node is the fallback.\nconst ctx = $json;\nconst rootName = $vars.DRIVE_ROOT || 'Question Bank';\nconst path = [rootName, ctx.board, ctx.class_name, ctx.chapter, ctx.question_type, ctx.difficulty];\n\nasync function findOrCreate(name, parentId) {\n  const q = encodeURIComponent(`name='${name.replace(/'/g, \"\\\\'\")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`);\n  const list = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'GET', url: `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, json: true\n  });\n  if (list.files && list.files.length) return list.files[0].id;\n  const created = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'POST', url: 'https://www.googleapis.com/drive/v3/files',\n    body: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }, json: true\n  });\n  return created.id;\n}\n\nlet parent = 'root';\nconst trail = [];\nfor (const seg of path) {\n  parent = await findOrCreate.call(this, seg, parent);\n  trail.push({ name: seg, id: parent });\n}\nreturn [{ json: { ...ctx, drive_folder_trail: trail, target_folder_id: parent } }];"
+      },
+      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "id": "node_collect_existing_stems",
+      "name": "Collect Existing Stems",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, 160],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Pulls up to N recent files from the target Drive folder, downloads them, extracts question stems.\nconst ctx = $('Attach Knowledge Object').first().json;\nconst lookback = parseInt($vars.DUP_LOOKBACK || '20', 10);\nconst files = ($input.all() || []).flatMap(i => i.json.files || []).slice(0, lookback);\nconst stems = [];\nfor (const f of files) {\n  try {\n    const data = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n      method: 'GET', url: `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`, json: true\n    });\n    for (const q of (data.questions || [])) {\n      const s = q.question || q.passage; if (s) stems.push(s);\n    }\n  } catch (e) { /* ignore broken files */ }\n}\nreturn [{ json: { ...ctx, target_folder_id: $('Ensure Drive Folders').first().json.target_folder_id, existing_stems: stems } }];"
+      },
+      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "id": "node_to_binary",
+      "name": "JSON → Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1480, -260],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst buffer = Buffer.from(JSON.stringify(ctx.final_payload, null, 2), 'utf8');\nreturn [{ json: ctx, binary: { data: { data: buffer.toString('base64'), mimeType: 'application/json', fileName: ctx.file_name } } }];"
+      }
+    },
+
+    {
+      "id": "node_upload_drive",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1700, -260],
+      "parameters": {
+        "operation": "upload",
+        "name": "={{ $json.file_name }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.target_folder_id }}" },
+        "binaryPropertyName": "data",
+        "options": { "fields": "id,name,webViewLink,parents" }
+      },
+      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "id": "node_log_summary",
+      "name": "Log Run Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1920, -260],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nreturn [{ json: {\n  status: 'OK',\n  batch_id: ctx.batch_id,\n  prompt_key: ctx.prompt_key,\n  chapter: ctx.chapter,\n  saved_file: ctx.file_name,\n  questions_saved: ctx.final_payload.question_count,\n  rejected_by_validator: (ctx.rejected || []).length,\n  dropped_duplicates: (ctx.dropped_duplicates || []).length,\n  drive_folder_trail: ctx.drive_folder_trail,\n  attempts: ctx.attempt\n}}];"
+      }
+    },
+
+    {
+      "id": "node_error_handler",
+      "name": "Error Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 360],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const err = $json.error || $json;\nreturn [{ json: { status: 'FAILED', stage: $json.node || 'unknown', message: err.message || String(err), batch_id: $('Normalize Input').first()?.json?.batch_id } }];"
+      }
+    }
+  ],
+
+  "connections": {
+    "Form: User Input":            { "main": [[{ "node": "Normalize Input", "type": "main", "index": 0 }]] },
+    "Normalize Input":             { "main": [[{ "node": "Extract PDF Text", "type": "main", "index": 0 }]] },
+    "Extract PDF Text":            { "main": [[{ "node": "Clean PDF Text", "type": "main", "index": 0 }]] },
+    "Clean PDF Text":              { "main": [[{ "node": "Structure Chapter Knowledge", "type": "main", "index": 0 }]] },
+    "Structure Chapter Knowledge": { "main": [[{ "node": "Attach Knowledge Object", "type": "main", "index": 0 }]] },
+    "Attach Knowledge Object":     { "main": [[{ "node": "Ensure Drive Folders", "type": "main", "index": 0 }]] },
+    "Ensure Drive Folders":        { "main": [[{ "node": "Load Existing Question Bank", "type": "main", "index": 0 }]] },
+    "Load Existing Question Bank": { "main": [[{ "node": "Collect Existing Stems", "type": "main", "index": 0 }]] },
+    "Collect Existing Stems":      { "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]] },
+    "Build Prompt":                { "main": [[{ "node": "AI: Generate Questions", "type": "main", "index": 0 }]] },
+    "AI: Generate Questions":      { "main": [[{ "node": "Parse Generation", "type": "main", "index": 0 }]] },
+    "Parse Generation":            { "main": [[{ "node": "AI: Validate Questions", "type": "main", "index": 0 }]] },
+    "AI: Validate Questions":      { "main": [[{ "node": "Filter Valid Questions", "type": "main", "index": 0 }]] },
+    "Filter Valid Questions":      { "main": [[{ "node": "Deduplicate vs Bank", "type": "main", "index": 0 }]] },
+    "Deduplicate vs Bank":         { "main": [[{ "node": "Need Regeneration?", "type": "main", "index": 0 }]] },
+    "Need Regeneration?":          { "main": [
+                                        [{ "node": "Prepare Regeneration Context", "type": "main", "index": 0 }],
+                                        [{ "node": "Finalize JSON", "type": "main", "index": 0 }]
+                                      ] },
+    "Prepare Regeneration Context":{ "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]] },
+    "Finalize JSON":               { "main": [[{ "node": "JSON → Binary", "type": "main", "index": 0 }]] },
+    "JSON → Binary":               { "main": [[{ "node": "Upload to Google Drive", "type": "main", "index": 0 }]] },
+    "Upload to Google Drive":      { "main": [[{ "node": "Log Run Summary", "type": "main", "index": 0 }]] }
+  },
+
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 1,
+
+  "_environment_variables_required": {
+    "GENERATOR_SYSTEM_PROMPT": "Contents of prompts/system-base.txt",
+    "STRUCTURER_PROMPT": "Contents of prompts/structurer.txt",
+    "VALIDATOR_PROMPT": "Contents of prompts/validator.txt",
+    "PROMPT_TEMPLATES": "Contents of prompts/templates.json (as a JSON string)",
+    "DRIVE_ROOT": "Question Bank",
+    "DUP_LOOKBACK": "20",
+    "MAX_REGEN_ATTEMPTS": "3"
+  },
+
+  "_credentials_required": {
+    "anthropicApi": "Anthropic API credential for Claude (used by Structurer, Generator, Validator)",
+    "googleDriveOAuth2Api": "Google Drive OAuth2 credential with drive.file scope"
+  }
+}

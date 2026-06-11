@@ -1,0 +1,67 @@
+{
+  "board": "CBSE",
+  "class": "Class XII",
+  "chapter": "Solutions",
+  "source_type": "NCERT",
+  "question_type": "MCQ",
+  "difficulty": "MEDIUM",
+  "language": "English",
+  "include_visual_questions": false,
+  "generate_explanation": true,
+  "question_count": 3,
+  "generated_at": "2026-06-11T09:01:24Z",
+  "batch_id": "lz9k2r-7f3a1c",
+  "questions": [
+    {
+      "question_id": "SOLUTIONS_MCQ_M_001",
+      "question": "At 300 K, the vapour pressure of an ideal solution containing 1 mol of A and 3 mol of B is 550 mm Hg. At the same temperature, if 1 more mol of B is added, the vapour pressure becomes 560 mm Hg. The vapour pressure of pure A is:",
+      "options": {
+        "A": "400 mm Hg",
+        "B": "500 mm Hg",
+        "C": "600 mm Hg",
+        "D": "640 mm Hg"
+      },
+      "answer": "A",
+      "explanation": "Using Raoult's law for ideal solutions, P = x_A * P°_A + x_B * P°_B. Solving the two simultaneous equations from the given data yields P°_A = 400 mm Hg and P°_B = 600 mm Hg.",
+      "difficulty": "MEDIUM",
+      "source_topic": "Raoult's Law for binary ideal solutions",
+      "visual_required": false,
+      "visual_type": null,
+      "bloom_level": "Apply"
+    },
+    {
+      "question_id": "SOLUTIONS_MCQ_M_002",
+      "question": "Which of the following pairs forms a maximum-boiling azeotrope?",
+      "options": {
+        "A": "Ethanol and water",
+        "B": "Nitric acid and water",
+        "C": "Benzene and toluene",
+        "D": "Hexane and heptane"
+      },
+      "answer": "B",
+      "explanation": "Nitric acid–water exhibits a strong negative deviation from Raoult's law due to hydrogen bonding between HNO3 and H2O, producing a maximum-boiling azeotrope at ~68 % HNO3.",
+      "difficulty": "MEDIUM",
+      "source_topic": "Non-ideal solutions and azeotropes",
+      "visual_required": false,
+      "visual_type": null,
+      "bloom_level": "Understand"
+    },
+    {
+      "question_id": "SOLUTIONS_MCQ_M_003",
+      "question": "0.6 g of urea (M = 60) is dissolved in 100 g of water. The elevation in boiling point (Kb for water = 0.52 K kg mol⁻¹) is closest to:",
+      "options": {
+        "A": "0.026 K",
+        "B": "0.052 K",
+        "C": "0.104 K",
+        "D": "0.520 K"
+      },
+      "answer": "B",
+      "explanation": "Molality = (0.6/60) / 0.1 = 0.1 mol/kg. ΔTb = Kb × m = 0.52 × 0.1 = 0.052 K. Urea is a non-electrolyte, so the van't Hoff factor i = 1.",
+      "difficulty": "MEDIUM",
+      "source_topic": "Colligative properties — boiling point elevation",
+      "visual_required": false,
+      "visual_type": null,
+      "bloom_level": "Apply"
+    }
+  ]
+}
