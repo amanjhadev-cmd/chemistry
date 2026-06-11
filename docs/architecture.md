@@ -1,143 +1,69 @@
-# Architecture
+# Architecture (post-refactor — MockGenie/QuestDrive pattern)
 
-## 1. Single-workflow design
+Two workflows, one form, 18 hidden prompts.
 
-The platform is one workflow with dynamic routing — not 18 sibling workflows.
+## Main workflow nodes
 
-The key trick is the **envelope object** that flows through every node:
-
-```json
-{
-  "board": "CBSE",
-  "class_name": "Class XII",
-  "chapter": "Solutions",
-  "source_type": "NCERT",
-  "question_type": "MCQ",
-  "difficulty": "MEDIUM",
-  "number_of_questions": 10,
-  "include_visual_questions": false,
-  "language": "English",
-  "generate_explanation": true,
-  "prompt_key": "MCQ_MEDIUM",
-  "chapter_code": "SOLUTIONS",
-  "difficulty_code": "M",
-  "batch_id": "lz9k2r-7f3a1c",
-  "started_at": "2026-06-11T09:00:00Z",
-  "cleaned_text": "...",
-  "chapter_knowledge": { ... },
-  "existing_stems": ["..."],
-  "target_folder_id": "1aBc...",
-  "drive_folder_trail": [ { "name": "Question Bank", "id": "..." }, ... ],
-  "attempt": 1,
-  "generated_questions": [...],
-  "validated_questions": [...],
-  "unique_questions": [...],
-  "kept_questions": [...],
-  "rejected": [...],
-  "dropped_duplicates": [...],
-  "final_payload": { ... },
-  "file_name": "..."
-}
-```
-
-Every Code node reads from `$json`, computes its delta, and returns `{...$json, <new fields>}`. There is one source of truth, no node knows about siblings.
-
-## 2. Why an upstream "Structure Chapter Knowledge" step
-
-Sending raw PDF text to the generator wastes tokens (CBSE chapters are 20-40 pages of mostly prose) and *invites hallucination* — the model fills gaps with plausible-but-wrong NCERT-adjacent facts.
-
-The structurer call:
-- Runs once per batch on the cheap model (Haiku).
-- Returns a compact JSON of `summary / sub_topics / definitions / formulae / reactions / numerical_data / examples / diagram_refs`.
-- The generator and the validator both receive **only** this object, so they share a common ground truth.
-
-Net effect: generator prompts are ~70 % smaller and the validator can ground-truth check by looking at the same JSON.
-
-## 3. Prompt routing
-
-`Build Prompt` is a Code node — not a Switch. A Switch would force one branch per combination (18 branches, plus duplicates of every downstream node).
-
-```js
-const templates = JSON.parse($vars.PROMPT_TEMPLATES);
-const entry = templates[ctx.prompt_key];   // "MCQ_MEDIUM" etc.
-```
-
-Adding a new question type means one PR that:
-1. Adds the type to the form dropdown.
-2. Adds three templates (`<TYPE>_EASY/MEDIUM/HARD`) to `prompts/templates.json`.
-3. Adds the type to `config/config.json` and to the Drive folder list.
-
-No workflow surgery.
-
-## 4. Validation as a separate model call
-
-A *second* LLM call (Haiku at temperature 0) validates the first one. We deliberately do not let the generator self-review — it's the same model, same context window, same blind spots.
-
-The validator receives:
-- The **chapter_knowledge** object (single source of truth)
-- The expected type and difficulty
-- The full generated batch
-
-It returns per-question booleans for nine checks. Any `false` ⇒ question is dropped. The Code node `Filter Valid Questions` enforces this strictly.
-
-## 5. Duplicate detection — two passes
-
-**Within batch**: normalised stem lookup using a `Set`.
-**Against existing bank**: trigram Jaccard similarity. A threshold of 0.85 catches paraphrases without flagging legitimately distinct questions on the same sub-topic.
-
-The bank is sampled — up to 20 most recent files from the target folder (`DUP_LOOKBACK`). Reading the entire bank does not scale and is not needed; near-duplicates almost always originate in a recent generation run.
-
-Why trigram Jaccard and not embeddings?
-- Zero infrastructure (no vector DB).
-- Deterministic and fast at the scales we care about (≤ 200 stems per check).
-- Embeddings can be added later by swapping the body of the `Deduplicate vs Bank` Code node — no surrounding changes.
-
-## 6. Regeneration loop
-
-`Need Regeneration?` checks two conditions:
-- `unique_questions.length < number_of_questions`
-- `attempt < MAX_REGEN_ATTEMPTS` (default 3)
-
-If both true, `Prepare Regeneration Context` keeps the questions we already validated, asks for just the deficit, and feeds the union of "already kept" and "bank" stems back into the prompt under `existing_question_stems`. The generator avoids regenerating what we already have.
-
-`attempt` is incremented inside `Build Prompt` so the bound is enforced regardless of how the loop is wired.
-
-## 7. Folder creation
-
-`Ensure Drive Folders` is a Code node that walks the path `Question Bank / Board / Class / Chapter / Type / Difficulty`, doing `findOrCreate` at each level via the Drive REST API with the OAuth credential.
-
-It returns the leaf `target_folder_id` *and* the full trail (handy for logging). Idempotent: re-running for the same path is a single `files.list` call per level.
-
-## 8. Final filename
-
-```
-{chapter}_{question_type}_{difficulty}_{batch_id}.json
-```
-
-The `batch_id` (base36 timestamp + 6 random chars) guarantees uniqueness without coordination. It is also stamped inside the JSON payload so downstream tools can correlate.
-
-## 9. Error handling
-
-Three layers:
-
-1. **Code-node validation** — every parsing step throws a descriptive `Error` if the upstream LLM returns malformed JSON. n8n surfaces these as failed executions.
-2. **`continueOnFail` on the Drive list call** — a fresh folder with no existing files must not break the pipeline; the lister returns an empty set and dedupe sees no bank.
-3. **Workflow-level Error Trigger** (operator action): wire a separate `errorTrigger`-style workflow that catches failures and posts the `Normalize Input` envelope to Slack/email. The `Error Branch` node in this workflow is the local catcher used when called via sub-workflow.
-
-We deliberately do not silently swallow LLM errors — a malformed generator response should fail loudly so the operator can inspect the prompt.
-
-## 10. Cost shape
-
-| Stage | Model | Approx tokens (per batch of 10) | Why this model |
+| # | Node | Type | Role |
 |---|---|---|---|
-| Structure Chapter Knowledge | Haiku 4.5 | ~5k in / ~2k out | Once per batch, deterministic, cheap |
-| Generator | Sonnet 4.6 | ~3k in / ~4k out | Quality matters more than cost; runs ~1.5 × on average due to validator drops |
-| Validator | Haiku 4.5 | ~4k in / ~1k out | Mechanical check, no creativity needed |
+| 1 | On form submission | formTrigger | 9 visible fields + 18 hidden prompt fields |
+| 2 | Create Root Folder | googleDrive (folder) | Creates `{Board}-{Class}-{Subject}-Ch-{n}-{Chapter}-Co-{n}-{Concept}` under the user-supplied Folder URL |
+| 3 | Generate 18 Question Prompts | code | Reshapes the 18 hidden fields into `[{level, items:[{type, prompt}, …]}]` |
+| 4 | Create Level Folder | googleDrive (folder) | EASY / MEDIUM / HARD folders under the root |
+| 5 | Loop Over 18 Items (Outer) | splitInBatches | Iterates per level; the "done" branch flows to Aggregate → Email, the "loop" branch flows into the next step |
+| 6 | Expand Level → Types | code | For the current level expands its 6 (type, prompt) pairs and attaches the matching level-folder id |
+| 7 | Create Type Folder | googleDrive (folder) | MCQ / VSA / SA / LA / AR / CASE_STUDY under the level folder |
+| 8 | Pack Prompt + Drive ID | set | Carries `questionPrompt` and the new folder's `driveid` |
+| 9 | Call: QuestDrive Sub-Workflow | executeWorkflow | Invokes the sub-workflow with 11 typed inputs |
+| 10 | Aggregate | aggregate | Pools all completed iterations |
+| 11 | Send Completion Email | gmail | Sends the operator a "done" mail |
 
-Switching models is a one-line change in three node parameters — they are *not* hard-coded in Code nodes.
+Connections form a strict DAG; nothing is left dangling. The outer loop's "done" output feeds Aggregate, the "loop" output feeds the expansion, and Call Sub-Workflow loops back into the outer loop so all 3 levels are processed in turn.
 
-## 11. What is intentionally not in this workflow
+## Sub-workflow nodes (QuestDrive)
 
-- **No retries on Anthropic 5xx** — n8n's built-in node retry handles transient errors; do not re-implement in Code.
-- **No analytics writes** — `Log Run Summary` is the seam; pipe it to wherever fits your stack.
-- **No PDF page-by-page splitting** — chapters fit in the context window of both the structurer and the generator. Add it the day a textbook chapter genuinely doesn't fit, not before.
+| # | Node | Type | Role |
+|---|---|---|---|
+| 1 | When Executed by Another Workflow | executeWorkflowTrigger | Receives 11 typed inputs |
+| 2 | Loop Over Items | splitInBatches | One iteration per (level × type) call |
+| 3 | Extract QuestionType | code | Normalises `questionType` from `questionPrompt` if missing |
+| 4 | AI Agent (Chemistry) | langchain.agent | System instructions + injects the (level × type) prompt and the chapter context |
+| 5 | Qwen3-Instruct | lmChatOpenRouter | LLM credential for the agent (swap to Anthropic / OpenAI here) |
+| 6 | Parse LLM HTML | code | Splits on `<p>QUESTION_START</p>` and parses each block. Branches by `QuestionType`: MCQ/A&R → options + correct letter(s); VSA/SA/LA → text answer; CASE_STUDY → whole cluster preserved |
+| 7 | Convert to JSON File | convertToFile | One binary per question |
+| 8 | Upload to Drive | googleDrive (file) | Drops `Q1.json … Q25.json` into the target type folder |
+
+## Why two workflows
+
+| Concern | Outcome |
+|---|---|
+| Execution-graph readability | 11 nodes per workflow vs 22+ jammed together |
+| Independent retry | A failed (level × type) can be re-run by calling the sub-workflow alone, with the same 11 inputs |
+| LLM provider swap | Touches only the sub-workflow (one model node) |
+| Folder-tree replay | The main workflow's `Create Folder*` nodes are idempotent — re-running over an existing tree reuses the folders |
+
+## Prompt routing
+
+There is **no Switch** node. Routing is implicit in the form structure:
+
+- 18 hidden fields are emitted under keys like `"EASY MCQ"`, `"MEDIUM VSA"`, …
+- `Generate 18 Question Prompts` walks `levels × formats` and emits one record per level with a 6-item `items` array.
+- `Expand Level → Types` (Code) reads `$runIndex` to know which level the outer loop is on and emits 6 items for that level.
+- `Pack Prompt + Drive ID` ferries the right prompt and folder id into the sub-workflow call.
+
+Adding a 19th prompt (or a new question type) is a 3-line change:
+1. Add a hidden field to the form.
+2. Append the type name to the `formats` array in `Generate 18 Question Prompts`.
+3. Done — the loops widen automatically.
+
+## Error / retry behaviour
+
+- `On form submission`, `Create Root Folder`, `Generate 18 Question Prompts`, `Create Level Folder`, `Loop Over 18 Items (Outer)`, `Send Completion Email` all have `retryOnFail: true`. Transient Drive 5xx and OAuth refreshes self-heal.
+- Sub-workflow inherits per-call retry from the main workflow's `executeWorkflow` call.
+- If the LLM returns malformed HTML, `Parse LLM HTML` will simply produce 0 questions for that call — visible in Executions; the rest of the batch continues.
+
+## What's intentionally not here
+
+- **No structurer pre-pass.** The reference workflow passes the PDF directly to the agent and relies on prompt rigor; we follow that pattern. If hallucination rate is too high in your dataset, add a structurer call in the sub-workflow between Trigger and Agent.
+- **No dedupe pass.** Reference assumes 25 questions per (level × type) is the unit and that human review is the next step. If you want dedupe, add a Code node between Parse LLM HTML and Convert to JSON File doing trigram Jaccard against prior runs.
+- **No validator LLM pass.** Same logic — easy to add as another agent node after parsing.

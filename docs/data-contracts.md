@@ -1,138 +1,128 @@
 # Data contracts
 
-This file is the source of truth for what each interface accepts and emits.
-
 ## 1. Form submission
 
-Field labels are the exact strings the form trigger emits.
+### Visible fields (user-facing)
 
-| Field | Type | Required | Allowed values / format |
+| Field | Type | Required | Allowed values |
 |---|---|---|---|
-| Board | dropdown | yes | `CBSE` |
-| Class | dropdown | yes | `Class XI`, `Class XII` |
-| Chapter Name | dropdown | yes | see `config/config.json#chapters` |
-| Source Type | dropdown | yes | `NCERT`, `Reference Book`, `Teacher Notes`, `PYQ Collection`, `Mixed` |
-| Reference PDF | file | yes | `.pdf`, single file |
-| Question Type | dropdown | yes | `MCQ`, `VSA`, `SA`, `LA`, `AR`, `CASE_STUDY` |
-| Difficulty | dropdown | yes | `EASY`, `MEDIUM`, `HARD` |
-| Number of Questions | number | no | integer ≥ 1, default `10` |
-| Include Visual Questions | dropdown | no | `YES`, `NO`, default `NO` |
-| Language | dropdown | no | `English`, default `English` |
-| Generate Explanation | dropdown | no | `YES`, `NO`, default `YES` |
+| Board | dropdown | yes | `CBSE`, `ICSE`, `ISC`, `MH` |
+| Class | dropdown | yes | `CLASS IX`, `CLASS X`, `CLASS XI`, `CLASS XII` |
+| Subject | dropdown | yes | `Chemistry` |
+| Chapter Name | text | yes | |
+| Chapter No (e.g. 1,2,3) | number | yes | |
+| Concept Name | text | yes | |
+| Concept No | number | yes | |
+| Reference Document | file | yes | `.pdf` |
+| Folder URL | text | yes | Drive folder URL `https://drive.google.com/drive/folders/<id>` |
 
-## 2. Internal envelope after `Normalize Input`
+### Hidden fields (prompts, set once)
+
+18 fields, keyed `<LEVEL> <TYPE>`:
+
+```
+EASY MCQ, EASY VSA, EASY SA, EASY LA, EASY A&R, EASY CASE_STUDY,
+MEDIUM MCQ, MEDIUM VSA, MEDIUM SA, MEDIUM LA, MEDIUM A&R, MEDIUM CASE_STUDY,
+HARD MCQ, HARD VSA, HARD SA, HARD LA, HARD A&R, HARD CASE_STUDY
+```
+
+Each `fieldValue` is a full prompt instructing the LLM to produce 25 items.
+
+## 2. Output of `Generate 18 Question Prompts`
+
+```json
+[
+  { "level": "EASY",   "items": [
+      { "type": "MCQ", "prompt": "ROLE: ..." },
+      { "type": "VSA", "prompt": "ROLE: ..." },
+      { "type": "SA",  "prompt": "ROLE: ..." },
+      { "type": "LA",  "prompt": "ROLE: ..." },
+      { "type": "A&R", "prompt": "ROLE: ..." },
+      { "type": "CASE_STUDY", "prompt": "ROLE: ..." }
+  ]},
+  { "level": "MEDIUM", "items": [ ... 6 items ... ] },
+  { "level": "HARD",   "items": [ ... 6 items ... ] }
+]
+```
+
+## 3. Sub-workflow input (typed)
 
 ```json
 {
-  "board": "CBSE",
-  "class_name": "Class XII",
-  "chapter": "Solutions",
-  "source_type": "NCERT",
-  "question_type": "MCQ",
-  "difficulty": "MEDIUM",
-  "number_of_questions": 10,
-  "include_visual_questions": false,
-  "language": "English",
-  "generate_explanation": true,
-  "prompt_key": "MCQ_MEDIUM",
-  "chapter_code": "SOLUTIONS",
-  "difficulty_code": "M",
-  "batch_id": "lz9k2r-7f3a1c",
-  "started_at": "2026-06-11T09:00:00Z"
+  "Board": "CBSE",
+  "Class": "CLASS XII",
+  "Subject": "Chemistry",
+  "Chapter Number": 1,
+  "Chapter Name": "Solutions",
+  "Concept Number": 2,
+  "Concept Name": "Raoult's Law",
+  "questionLevel": "MEDIUM",
+  "questionType": "MCQ",
+  "questionPrompt": "ROLE: ...full prompt for MEDIUM MCQ...",
+  "driveid": "1aBcDeFgHiJ..."
 }
 ```
 
-## 3. `chapter_knowledge` (output of `Structure Chapter Knowledge`)
+## 4. LLM output contract
 
-See `prompts/structurer.txt` for the canonical schema. All array fields are required; an empty array `[]` is legal.
+The agent is instructed to emit HTML, with every question prefixed by exactly:
 
-## 4. Generator output
+```html
+<p>QUESTION_START</p>
+```
+
+Per-type structure:
+
+| Type | Structure after `QUESTION_START` |
+|---|---|
+| MCQ, A&R | `<p>question</p><ul><li>A] …</li>…<li>D] …</li></ul><p>Answer : B,D</p>` |
+| VSA, SA, LA | `<p>question</p><p>Answer : …</p>` |
+| CASE_STUDY | `<p>Passage: …</p><ol><li>(i) … Answer : C</li>… </ol>` |
+
+## 5. Final per-question file (uploaded to Drive)
+
+Filename: `Q<n>.json` inside the type folder.
 
 ```json
 {
-  "questions": [
-    {
-      "question_id": "SOLUTIONS_MCQ_M_001",
-      "question": "...",
-      "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
-      "answer": "B",
-      "explanation": "...",
-      "difficulty": "MEDIUM",
-      "source_topic": "Raoult's Law",
-      "visual_required": false,
-      "visual_type": null,
-      "bloom_level": "Apply"
+  "Metadata": {
+    "board": "CBSE",
+    "class": "CLASS XII",
+    "subject": "Chemistry",
+    "chapter_no": 1,
+    "chapter_name": "Solutions",
+    "concept_no": 2,
+    "concept_name": "Raoult's Law",
+    "question_level": "MEDIUM",
+    "question_type": "MCQ"
+  },
+  "questionHtml": {
+    "question_no": "Q1",
+    "question_text": "<p>...</p>",
+    "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+    "final_answer": {
+      "correct_option": "B,D",
+      "model_answer": null
     }
-  ]
+  }
 }
 ```
 
-For `VSA`, `SA`, `LA`: `options` is `null`, `answer` is the model answer text.
-For `AR`: `options` is the standard 4-option map (A-D), `answer` is one of `A|B|C|D`.
-For `CASE_STUDY`: each entry has a `passage` and a `sub_questions[]` array; each sub-question follows MCQ / VSA / SA shape.
+For written types (VSA / SA / LA): `options = {}`, `correct_option = ""`, `model_answer` holds the answer text.
+For CASE_STUDY: `question_text` carries the parsed passage; `model_answer` carries the full original HTML cluster (4 sub-questions inline).
 
-## 5. Validator output
-
-```json
-{
-  "results": [
-    {
-      "question_id": "SOLUTIONS_MCQ_M_001",
-      "valid": true,
-      "checks": {
-        "scientifically_correct": true,
-        "answer_matches_question": true,
-        "options_well_formed": true,
-        "ncert_aligned": true,
-        "difficulty_aligned": true,
-        "grammar_ok": true,
-        "spelling_ok": true,
-        "complete": true,
-        "explanation_correct": true
-      },
-      "issues": [],
-      "fix_hint": null
-    }
-  ]
-}
-```
-
-A question is kept ⇔ `valid === true`. Anything else (including `undefined`) is dropped and the reason is captured in `rejected[]`.
-
-## 6. Final payload (uploaded to Drive)
-
-Matches the schema in the spec exactly:
-
-```json
-{
-  "board": "CBSE",
-  "class": "Class XII",
-  "chapter": "Solutions",
-  "source_type": "NCERT",
-  "question_type": "MCQ",
-  "difficulty": "MEDIUM",
-  "language": "English",
-  "include_visual_questions": false,
-  "generate_explanation": true,
-  "question_count": 10,
-  "generated_at": "2026-06-11T09:01:24Z",
-  "batch_id": "lz9k2r-7f3a1c",
-  "questions": [ /* see §4 */ ]
-}
-```
-
-Note the schema-superset: `language`, `include_visual_questions`, `generate_explanation`, `generated_at`, and `batch_id` are added on top of the spec for downstream traceability without breaking the spec's required keys.
-
-## 7. Drive path
+## 6. Drive layout
 
 ```
-Question Bank /
-  CBSE /
-    <Class XI | Class XII> /
-      <Chapter Name> /
-        <MCQ | VSA | SA | LA | AR | CASE_STUDY> /
-          <EASY | MEDIUM | HARD> /
-            <chapter>_<question_type>_<difficulty>_<batch_id>.json
+<Folder URL parent>/
+  CBSE-CLASS XII-Chemistry-Ch-1-Solutions-Co-2-Raoult's Law/
+    EASY/
+      MCQ/  Q1.json … Q25.json
+      VSA/  …
+      SA/   …
+      LA/   …
+      AR/   …                           ← A&R is sanitised to AR for the folder name
+      CASE_STUDY/  …
+    MEDIUM/  …same six type folders
+    HARD/    …same six type folders
 ```
-
-Folder names are exact strings — spaces preserved (e.g. `Class XII`, `Solutions`). The filename is sanitised: spaces and punctuation in the chapter become `_`.

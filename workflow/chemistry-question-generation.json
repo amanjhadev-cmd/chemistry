@@ -1,431 +1,267 @@
 {
-  "name": "Chemistry Question Generation Platform",
-  "active": false,
-  "settings": {
-    "executionOrder": "v1",
-    "saveExecutionProgress": true,
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
-  },
-  "tags": [
-    { "name": "Chemistry" },
-    { "name": "CBSE" },
-    { "name": "Question Bank" }
-  ],
-  "meta": {
-    "templateCredsSetupCompleted": false,
-    "description": "Single workflow that ingests a chapter PDF, structures its knowledge, dynamically selects one of 18 prompt templates by (question_type x difficulty), generates questions with an LLM, validates them, removes duplicates against the existing bank, and stores the final JSON in a Board/Class/Chapter/Type/Difficulty folder tree on Google Drive."
-  },
-
+  "name": "Chemistry Question Generation Platform — Main",
   "nodes": [
     {
-      "id": "node_form_trigger",
-      "name": "Form: User Input",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.2,
-      "position": [-1600, 0],
       "parameters": {
-        "formTitle": "Chemistry Question Generator",
-        "formDescription": "Generate a CBSE Chemistry question bank from a chapter PDF.",
+        "formTitle": "Chemistry Question Generator (CBSE)",
+        "formDescription": "Generate a CBSE Chemistry question bank from a chapter / concept PDF. All 18 prompts are pre-loaded as hidden fields.",
         "formFields": {
           "values": [
             { "fieldLabel": "Board", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [ { "option": "CBSE" } ] } },
+              "fieldOptions": { "values": [ { "option": "CBSE" }, { "option": "ICSE" }, { "option": "ISC" }, { "option": "MH" } ] } },
             { "fieldLabel": "Class", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [ { "option": "Class XI" }, { "option": "Class XII" } ] } },
-            { "fieldLabel": "Chapter Name", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [
-                { "option": "Some Basic Concepts of Chemistry" },
-                { "option": "Structure of Atom" },
-                { "option": "Thermodynamics" },
-                { "option": "Equilibrium" },
-                { "option": "Redox Reactions" },
-                { "option": "Hydrocarbons" },
-                { "option": "Solutions" },
-                { "option": "Electrochemistry" },
-                { "option": "Chemical Kinetics" },
-                { "option": "Coordination Compounds" },
-                { "option": "Haloalkanes and Haloarenes" },
-                { "option": "Alcohols, Phenols and Ethers" },
-                { "option": "Aldehydes, Ketones and Carboxylic Acids" },
-                { "option": "Amines" },
-                { "option": "Biomolecules" }
-              ] } },
-            { "fieldLabel": "Source Type", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [
-                { "option": "NCERT" }, { "option": "Reference Book" }, { "option": "Teacher Notes" },
-                { "option": "PYQ Collection" }, { "option": "Mixed" } ] } },
-            { "fieldLabel": "Reference PDF", "fieldType": "file", "requiredField": true,
-              "acceptFileTypes": ".pdf", "multipleFiles": false },
-            { "fieldLabel": "Question Type", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [
-                { "option": "MCQ" }, { "option": "VSA" }, { "option": "SA" },
-                { "option": "LA" }, { "option": "AR" }, { "option": "CASE_STUDY" } ] } },
-            { "fieldLabel": "Difficulty", "fieldType": "dropdown", "requiredField": true,
-              "fieldOptions": { "values": [ { "option": "EASY" }, { "option": "MEDIUM" }, { "option": "HARD" } ] } },
-            { "fieldLabel": "Number of Questions", "fieldType": "number", "requiredField": false },
-            { "fieldLabel": "Include Visual Questions", "fieldType": "dropdown", "requiredField": false,
-              "fieldOptions": { "values": [ { "option": "NO" }, { "option": "YES" } ] } },
-            { "fieldLabel": "Language", "fieldType": "dropdown", "requiredField": false,
-              "fieldOptions": { "values": [ { "option": "English" } ] } },
-            { "fieldLabel": "Generate Explanation", "fieldType": "dropdown", "requiredField": false,
-              "fieldOptions": { "values": [ { "option": "YES" }, { "option": "NO" } ] } }
+              "fieldOptions": { "values": [ { "option": "CLASS IX" }, { "option": "CLASS X" }, { "option": "CLASS XI" }, { "option": "CLASS XII" } ] } },
+            { "fieldLabel": "Subject", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "Chemistry" } ] } },
+            { "fieldLabel": "Chapter Name", "requiredField": true },
+            { "fieldLabel": "Chapter No (e.g. 1,2,3)", "fieldType": "number", "requiredField": true },
+            { "fieldLabel": "Concept Name", "requiredField": true },
+            { "fieldLabel": "Concept No", "fieldType": "number", "requiredField": true },
+            { "fieldLabel": "Reference Document", "fieldType": "file", "requiredField": true, "acceptFileTypes": ".pdf" },
+            { "fieldLabel": "Folder URL", "placeholder": "Paste Google Drive parent folder URL", "requiredField": true },
+
+            { "fieldName": "EASY MCQ", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: You are an expert CBSE Chemistry question setter producing 25 Multiple Choice Questions (MCQs) of EASY complexity for K-12 students, strictly grounded in the supplied reference PDF. EASY PROFILE: direct recall of definitions, formulae, named reactions; single-step reasoning; familiar contexts; closed-ended with one or more clearly correct options; lower-order Bloom (Remember / Understand). INSTRUCTIONS: Generate 25 MCQs covering definitions, properties, simple equations, named reactions, and one-step numericals from the chapter. Each MCQ has 4 options A]-D] with AT LEAST 2 correct (multi-select). Provide plausible distractors built on common K-12 chemistry misconceptions. Use exam-oriented phrasing, not textbook copy-paste. Do NOT bold correct options. Avoid repeating the same correct-option pattern in consecutive items. Output strictly the questions in the format: '1. Question text\\n A] option\\n B] option\\n C] option\\n D] option\\n Answer : B,D'. KATEX: wrap every math/chem expression inline with single $...$; never use \\\\[ \\\\] or \\\\( \\\\); no spaces inside the $ ... $; use $H_2O$, $H_2SO_4$, $x^2$, $v_i$, $\\\\Delta H$, $K_c$. RESTRICTIONS: no hallucinations beyond the PDF; no near-identical numeric options; no repeated answer patterns; no introductions or summaries — only the 25 items." },
+
+            { "fieldName": "EASY VSA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry VSA (Very Short Answer, 1-mark) setter producing 25 EASY items grounded in the PDF. EASY PROFILE: direct recall — a single fact, definition, formula, or named entity. INSTRUCTIONS: Generate 25 VSAs. Each item is one short question followed by a one-line authoritative answer (≤ 25 words). Cover definitions, units, SI values, IUPAC names, named reactions, characteristic tests. Output format: '1. Question text\\n Answer : <single fact / definition / formula>'. KATEX as inline $...$ for any equation/formula ($pH$, $K_a$, $\\\\Delta G^{\\\\circ}$, $H_2O$). RESTRICTIONS: no MCQ options, no multi-step working, no preamble or closing notes — only the 25 items." },
+
+            { "fieldName": "EASY SA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry SA (Short Answer, 2-3 mark) setter producing 25 EASY items from the PDF. EASY PROFILE: two-part definitions, simple derivations, one short worked example. INSTRUCTIONS: Generate 25 SAs. Each item is the question plus a model answer of 40-80 words. Where applicable include a one-line balanced equation OR a single numerical step. Output format: '1. Question text\\n Answer : <40-80 word model answer>'. KATEX inline with $...$ (e.g. $PV = nRT$, $\\\\Delta T_b = K_b m$). RESTRICTIONS: no options; no multi-paragraph essays; no hallucinated reactions; no headers or closing remarks — only the 25 items." },
+
+            { "fieldName": "EASY LA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry LA (Long Answer, 5-mark) setter producing 25 EASY items grounded in the PDF. EASY PROFILE: covers one major sub-topic end-to-end with definitions, one balanced reaction, and a simple application. INSTRUCTIONS: Generate 25 LAs. Each model answer is 150-220 words and MUST include at least one balanced chemical equation (rendered in KaTeX) when the sub-topic supports it. Output format: '1. Question text\\n Answer : <150-220 word model answer including the balanced equation inline>'. KATEX inline $...$ for every equation/reaction, e.g. $2H_2 + O_2 \\\\rightarrow 2H_2O$, $E_{cell} = E^{\\\\circ}_{cell} - \\\\frac{RT}{nF} \\\\ln Q$. RESTRICTIONS: no options; no fabricated constants or named reactions; no headers, footers, or closing notes — only the 25 items." },
+
+            { "fieldName": "EASY A&R", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry Assertion & Reason setter producing 25 EASY items from the PDF. EASY PROFILE: both Assertion and Reason are direct recall sentences ≤ 25 words each; the link between them is single-step. INSTRUCTIONS: Generate 25 A&R items. Use the EXACT four fixed options: A] Both A and R are true, and R correctly explains A B] Both A and R are true, but R does not explain A C] A is true, R is false D] A is false, R is true. Exactly one correct option. Output format: '1. Assertion (A): <statement>\\n Reason (R): <statement>\\n A] ...\\n B] ...\\n C] ...\\n D] ...\\n Answer : B'. Avoid repeating the same correct letter in consecutive questions. KATEX inline $...$ for chem/math (e.g. $sp^3$, $H_2O$, $\\\\Delta H < 0$). RESTRICTIONS: do not alter option wording; no hallucinations; no preamble or closing text — only the 25 items." },
+
+            { "fieldName": "EASY CASE_STUDY", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry case-study setter producing 25 EASY case-study clusters from the PDF. EASY PROFILE: 80-150 word stimulus passage drawn ONLY from the chapter; 4 sub-questions (3 MCQ + 1 VSA); single-step reasoning. INSTRUCTIONS: For each of the 25 case studies emit: a stimulus passage, then 4 sub-questions numbered (i)-(iv). Sub-questions (i)-(iii) are MCQs with options A]-D] and a single correct option. Sub-question (iv) is a VSA with a one-line answer. Output format per case study: 'CASE 1. <passage>\\n (i) <q>\\n A] ... B] ... C] ... D] ... Answer : C\\n (ii) ... Answer : A\\n (iii) ... Answer : D\\n (iv) <q>\\n Answer : <short fact>'. KATEX inline $...$ for any chem/math. RESTRICTIONS: passages must be paraphrases of PDF content — no fabrication; no markdown headings; no closing summary — only the 25 clusters." },
+
+            { "fieldName": "MEDIUM MCQ", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry MCQ setter producing 25 MEDIUM items grounded in the PDF. MEDIUM PROFILE: integration of 2-3 related concepts; 2-3 logical steps; tidy decimals; mildly novel context; distractors include at least one near-miss; Bloom: Apply / Analyze. INSTRUCTIONS: 25 MCQs — mix conceptual, numerical, and short-derivation items. Each has 4 options A]-D] with 2 or 3 correct (never all four). Output format: '1. Question text\\n A] option\\n B] option\\n C] option\\n D] option\\n Answer : B,D'. KATEX inline $...$ for every formula/equation ($K_c$, $K_p$, $\\\\Delta G = -nFE_{cell}$, $r = k[A]^m[B]^n$). RESTRICTIONS: no hallucinations beyond the PDF; no numerically-too-close options; no repeated answer patterns; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "MEDIUM VSA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry VSA setter producing 25 MEDIUM (1 mark) items from the PDF. MEDIUM PROFILE: 'state / give a reason / write the IUPAC name / predict the product' style — one precise concept-application sentence. INSTRUCTIONS: 25 VSAs. Model answer ≤ 30 words but must contain the precise scientific reason or term. Output format: '1. Question text\\n Answer : <≤ 30 word precise scientific answer>'. KATEX inline $...$ for chem/math. RESTRICTIONS: no MCQ options; no multi-paragraph answers; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "MEDIUM SA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry SA setter producing 25 MEDIUM (3 mark) items from the PDF. MEDIUM PROFILE: concept + small numerical, or concept + reasoning, or mechanism + product. INSTRUCTIONS: 25 SAs. Model answer 60-120 words. Numericals must show the substitution step and the final value with units. Output format: '1. Question text\\n Answer : <60-120 word model answer with working>'. KATEX inline $...$ for every formula and unit ($n = \\\\frac{w}{M}$, $\\\\text{mol L}^{-1}$). RESTRICTIONS: no options; no fabricated constants; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "MEDIUM LA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry LA setter producing 25 MEDIUM (5 mark) items from the PDF. MEDIUM PROFILE: integrates 2 sub-topics with a numerical or mechanism. INSTRUCTIONS: 25 LAs. Model answer 200-300 words and MUST include at least one balanced equation and either a mechanism arrow-push outline OR a calculation with units. Output format: '1. Question text\\n Answer : <200-300 word model answer>'. KATEX inline $...$ for every equation/structure cue. RESTRICTIONS: no options; no fabricated reactions; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "MEDIUM A&R", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry A&R setter producing 25 MEDIUM items from the PDF. MEDIUM PROFILE: distinguishing 'R explains A' from 'R is merely true' requires concept understanding, not just recall. INSTRUCTIONS: 25 A&R items using the EXACT four fixed options A]-D] (same wording as EASY A&R). Exactly one correct option per item. Output format: '1. Assertion (A): <statement>\\n Reason (R): <statement>\\n A] ... B] ... C] ... D] ...\\n Answer : B'. KATEX inline $...$ for chem/math. RESTRICTIONS: no option wording changes; no fabrication; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "MEDIUM CASE_STUDY", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry case-study setter producing 25 MEDIUM clusters from the PDF. MEDIUM PROFILE: 120-200 word passage; 4 sub-questions (2 MCQ + 1 VSA + 1 SA); at least one sub-question is numerical if the chapter supports it. INSTRUCTIONS: Output per cluster: 'CASE 1. <passage>\\n (i) <MCQ> ... Answer : B\\n (ii) <MCQ> ... Answer : D\\n (iii) <VSA> Answer : <≤30 words>\\n (iv) <SA> Answer : <60-120 words with working>'. KATEX inline $...$ throughout. RESTRICTIONS: passages must be PDF-grounded; no fabrication; no preamble or closing — only the 25 clusters." },
+
+            { "fieldName": "HARD MCQ", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry MCQ setter producing 25 HARD (HOTS) items from the PDF. HARD PROFILE: 4+ logical steps; multi-concept synthesis; trap-style distractors; Bloom: Analyze / Evaluate. INSTRUCTIONS: 25 MCQs, mix of multi-step numericals and conceptual traps. Each has 4 options A]-D] with 2 or 3 correct (never all four). Distractors must require genuine analysis to eliminate. Output format: '1. Question text\\n A] ... B] ... C] ... D] ...\\n Answer : A,C'. KATEX inline $...$ for every expression ($\\\\ln K = -\\\\frac{\\\\Delta G^{\\\\circ}}{RT}$, $E_{cell} = E^{\\\\circ}_{cell} - \\\\frac{0.0591}{n}\\\\log Q$). RESTRICTIONS: no hallucinations; no numerically-too-close options; no repeated answer patterns; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "HARD VSA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry VSA setter producing 25 HARD items from the PDF. HARD PROFILE: requires a precise term, formula, or one-line justification that combines two ideas; answers in the form 'Why does X happen?' with the precise cause. INSTRUCTIONS: 25 VSAs. Answer ≤ 30 words but must combine 2 concepts. Output: '1. Question text\\n Answer : <≤30 word precise multi-concept answer>'. KATEX inline $...$. RESTRICTIONS: no options; no fluff; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "HARD SA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry SA setter producing 25 HARD items from the PDF. HARD PROFILE: multi-step numerical OR multi-concept reasoning suitable for CBSE board toppers. INSTRUCTIONS: 25 SAs. Model answer 80-150 words with full working. Output: '1. Question text\\n Answer : <80-150 word model answer with full working>'. KATEX inline $...$ for every formula and intermediate step. RESTRICTIONS: no options; no fabricated constants; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "HARD LA", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry LA setter producing 25 HARD items from the PDF. HARD PROFILE: synthesis across 3+ sub-topics with mechanism, derivation, AND a numerical. INSTRUCTIONS: 25 LAs. Model answer 250-400 words; MUST include at least one balanced equation, one mechanism cue, and one calculation with units. Output: '1. Question text\\n Answer : <250-400 word model answer>'. KATEX inline $...$ throughout. RESTRICTIONS: no options; no fabricated reactions; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "HARD A&R", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry A&R setter producing 25 HARD items from the PDF. HARD PROFILE: both A and R are non-trivial; the discrimination between 'R explains A' and 'R is merely true' must be conceptual, not based on wording tricks. INSTRUCTIONS: 25 A&R items using the EXACT four fixed options A]-D]. Exactly one correct option per item. Output format: '1. Assertion (A): <statement>\\n Reason (R): <statement>\\n A] ... B] ... C] ... D] ...\\n Answer : B'. KATEX inline $...$ for chem/math. RESTRICTIONS: no option wording changes; no fabrication; no preamble or closing — only the 25 items." },
+
+            { "fieldName": "HARD CASE_STUDY", "fieldType": "hiddenField",
+              "fieldValue": "ROLE: CBSE Chemistry case-study setter producing 25 HARD clusters from the PDF. HARD PROFILE: 150-250 word passage incorporating a small data table or graph description; 4 progressively harder sub-questions (1 MCQ + 1 A&R + 1 SA + 1 LA-style). INSTRUCTIONS: Output per cluster: 'CASE 1. <passage including a 2-3 row data table cue>\\n (i) <MCQ> ... Answer : C\\n (ii) <A&R with 4 fixed options> Answer : B\\n (iii) <SA> Answer : <60-120 words with working>\\n (iv) <LA-style> Answer : <200-300 words with balanced equation + calculation>'. KATEX inline $...$ throughout. RESTRICTIONS: passages must be PDF-grounded; no fabrication; no preamble or closing — only the 25 clusters." }
           ]
         },
-        "options": { "respondWith": "showText", "formSubmittedText": "Generation started. You'll find the JSON in Google Drive when done." }
-      }
-    },
-
-    {
-      "id": "node_normalize_input",
-      "name": "Normalize Input",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-1380, 0],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const f = $input.first().json;\nconst num = parseInt(f['Number of Questions'], 10);\nconst batchId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);\nconst chapterCode = (f['Chapter Name'] || 'CHP').toUpperCase().replace(/[^A-Z0-9]+/g,'_').slice(0,12);\nconst diffCode = ({EASY:'E', MEDIUM:'M', HARD:'H'})[f['Difficulty']] || 'M';\nreturn [{ json: {\n  board: f['Board'],\n  class_name: f['Class'],\n  chapter: f['Chapter Name'],\n  source_type: f['Source Type'],\n  question_type: f['Question Type'],\n  difficulty: f['Difficulty'],\n  number_of_questions: Number.isFinite(num) && num > 0 ? num : 10,\n  include_visual_questions: (f['Include Visual Questions'] || 'NO').toUpperCase() === 'YES',\n  language: f['Language'] || 'English',\n  generate_explanation: (f['Generate Explanation'] || 'YES').toUpperCase() === 'YES',\n  prompt_key: `${f['Question Type']}_${f['Difficulty']}`,\n  chapter_code: chapterCode,\n  difficulty_code: diffCode,\n  batch_id: batchId,\n  started_at: new Date().toISOString()\n}, binary: $input.first().binary }];"
-      }
-    },
-
-    {
-      "id": "node_extract_pdf",
-      "name": "Extract PDF Text",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [-1160, 0],
-      "parameters": {
-        "operation": "pdf",
-        "binaryPropertyName": "Reference_PDF",
-        "options": { "joinPages": true }
-      }
-    },
-
-    {
-      "id": "node_clean_text",
-      "name": "Clean PDF Text",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-940, 0],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const raw = ($json.text || '').toString();\n// 1) Strip page numbers like 'Page 12 of 40' or standalone numeric lines\nlet t = raw.replace(/Page\\s+\\d+\\s+of\\s+\\d+/gi, '');\nt = t.split('\\n').filter(l => !/^\\s*\\d{1,3}\\s*$/.test(l)).join('\\n');\n// 2) Strip repeated headers/footers (lines appearing >5 times)\nconst freq = new Map();\nt.split('\\n').forEach(l => { const k=l.trim(); if(k.length>0 && k.length<80) freq.set(k,(freq.get(k)||0)+1); });\nconst headers = new Set([...freq].filter(([,c]) => c > 5).map(([k]) => k));\nt = t.split('\\n').filter(l => !headers.has(l.trim())).join('\\n');\n// 3) Fix common OCR artefacts\nt = t.replace(/-\\n(\\w)/g, '$1');             // de-hyphenate line breaks\nt = t.replace(/[ \\t]{2,}/g, ' ');\nt = t.replace(/\\n{3,}/g, '\\n\\n');\nt = t.replace(/[\\u0000-\\u001F\\u007F]/g, ' ');\n// 4) Drop obvious URL/email tracker lines\nt = t.split('\\n').filter(l => !/^(https?:|www\\.|email:)/i.test(l.trim())).join('\\n');\n// 5) Collapse duplicate adjacent paragraphs\nconst paras = t.split(/\\n\\n+/);\nconst dedup = [];\nfor (const p of paras) { if (dedup[dedup.length-1] !== p) dedup.push(p); }\nreturn [{ json: { ...$('Normalize Input').first().json, cleaned_text: dedup.join('\\n\\n').trim() } }];"
-      }
-    },
-
-    {
-      "id": "node_structure_knowledge",
-      "name": "Structure Chapter Knowledge",
-      "type": "n8n-nodes-base.anthropic",
-      "typeVersion": 1,
-      "position": [-720, 0],
-      "parameters": {
-        "resource": "message",
-        "operation": "create",
-        "modelId": "claude-haiku-4-5-20251001",
-        "system": "={{ $vars.STRUCTURER_PROMPT }}",
-        "messages": {
-          "values": [
-            {
-              "role": "user",
-              "content": "=Chapter: {{$json.chapter}}\nClass: {{$json.class_name}}\nBoard: {{$json.board}}\nSource type: {{$json.source_type}}\n\nRAW CLEANED CHAPTER TEXT:\n{{$json.cleaned_text}}"
-            }
-          ]
-        },
-        "options": { "maxTokensToSample": 4000, "temperature": 0 }
-      }
-    },
-
-    {
-      "id": "node_attach_knowledge",
-      "name": "Attach Knowledge Object",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-500, 0],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $('Clean PDF Text').first().json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet knowledge;\ntry { knowledge = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Structurer did not return JSON: ' + e.message); }\nreturn [{ json: { ...ctx, chapter_knowledge: knowledge } }];"
-      }
-    },
-
-    {
-      "id": "node_load_existing_bank",
-      "name": "Load Existing Question Bank",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [-280, 160],
-      "parameters": {
-        "operation": "list",
-        "filter": {
-          "folderId": { "__rl": true, "value": "={{ $('Ensure Drive Folders').item.json.target_folder_id }}", "mode": "id" }
-        },
-        "options": { "fields": "files(id,name)" }
+        "options": {}
       },
-      "continueOnFail": true,
-      "notes": "Lists files inside the target folder so the duplicate-detector can fetch recent question stems. Runs AFTER folders are ensured (see connection ordering)."
+      "id": "n_form",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [-1600, 0],
+      "webhookId": "chemistry-form-trigger",
+      "retryOnFail": true
     },
 
     {
-      "id": "node_build_prompt",
-      "name": "Build Prompt",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-280, -160],
       "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nconst templates = $vars.PROMPT_TEMPLATES;   // injected via n8n environment variable (JSON string)\nconst tpl = typeof templates === 'string' ? JSON.parse(templates) : templates;\nconst key = ctx.prompt_key;\nconst entry = tpl[key];\nif (!entry) throw new Error('No prompt template for key ' + key);\n\nconst footer = tpl._meta.shared_footer\n  .replaceAll('{{number_of_questions}}', String(ctx.number_of_questions))\n  .replaceAll('{{chapter_code}}', ctx.chapter_code)\n  .replaceAll('{{existing_question_stems}}', JSON.stringify(ctx.existing_stems || []));\n\nconst body = [\n  entry.instruction,\n  'Rules:\\n- ' + entry.rules.join('\\n- '),\n  '',\n  'Context:',\n  `board=${ctx.board}`,\n  `class=${ctx.class_name}`,\n  `chapter=${ctx.chapter}`,\n  `source_type=${ctx.source_type}`,\n  `language=${ctx.language}`,\n  `include_visual_questions=${ctx.include_visual_questions}`,\n  `generate_explanation=${ctx.generate_explanation}`,\n  `batch_id=${ctx.batch_id}`,\n  '',\n  'CHAPTER KNOWLEDGE (use ONLY this):',\n  JSON.stringify(ctx.chapter_knowledge),\n  '',\n  footer\n].join('\\n')\n .replaceAll('{{board}}', ctx.board)\n .replaceAll('{{class}}', ctx.class_name)\n .replaceAll('{{chapter}}', ctx.chapter)\n .replaceAll('{{source_type}}', ctx.source_type)\n .replaceAll('{{language}}', ctx.language)\n .replaceAll('{{include_visual_questions}}', String(ctx.include_visual_questions))\n .replaceAll('{{generate_explanation}}', String(ctx.generate_explanation));\n\nreturn [{ json: { ...ctx, prompt_user_message: body, attempt: (ctx.attempt || 0) + 1 } }];"
-      }
-    },
-
-    {
-      "id": "node_generate_questions",
-      "name": "AI: Generate Questions",
-      "type": "n8n-nodes-base.anthropic",
-      "typeVersion": 1,
-      "position": [-60, -160],
-      "parameters": {
-        "resource": "message",
-        "operation": "create",
-        "modelId": "claude-sonnet-4-6",
-        "system": "={{ $vars.GENERATOR_SYSTEM_PROMPT }}",
-        "messages": {
-          "values": [
-            { "role": "user", "content": "={{ $json.prompt_user_message }}" }
-          ]
-        },
-        "options": { "maxTokensToSample": 8000, "temperature": 0.4 }
-      }
-    },
-
-    {
-      "id": "node_parse_generation",
-      "name": "Parse Generation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [160, -160],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $('Build Prompt').item.json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet parsed;\ntry { parsed = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Generator returned non-JSON: ' + e.message); }\nconst questions = Array.isArray(parsed.questions) ? parsed.questions : [];\nif (!questions.length) throw new Error('Generator returned 0 questions');\nreturn [{ json: { ...ctx, generated_questions: questions } }];"
-      }
-    },
-
-    {
-      "id": "node_validate_questions",
-      "name": "AI: Validate Questions",
-      "type": "n8n-nodes-base.anthropic",
-      "typeVersion": 1,
-      "position": [380, -160],
-      "parameters": {
-        "resource": "message",
-        "operation": "create",
-        "modelId": "claude-haiku-4-5-20251001",
-        "system": "={{ $vars.VALIDATOR_PROMPT }}",
-        "messages": {
-          "values": [
-            {
-              "role": "user",
-              "content": "=expected_question_type: {{$json.question_type}}\nexpected_difficulty: {{$json.difficulty}}\n\nchapter_knowledge:\n{{ JSON.stringify($json.chapter_knowledge) }}\n\nquestions:\n{{ JSON.stringify($json.generated_questions) }}"
-            }
-          ]
-        },
-        "options": { "maxTokensToSample": 4000, "temperature": 0 }
-      }
-    },
-
-    {
-      "id": "node_filter_valid",
-      "name": "Filter Valid Questions",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [600, -160],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $('Parse Generation').item.json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '{}';\nlet verdict;\ntry { verdict = JSON.parse(raw.trim().replace(/^```json|```$/g,'')); }\ncatch(e){ throw new Error('Validator returned non-JSON: ' + e.message); }\nconst byId = new Map((verdict.results||[]).map(r => [r.question_id, r]));\nconst keep = ctx.generated_questions.filter(q => byId.get(q.question_id)?.valid === true);\nconst rejected = ctx.generated_questions\n  .filter(q => byId.get(q.question_id)?.valid !== true)\n  .map(q => ({ id: q.question_id, issues: byId.get(q.question_id)?.issues || ['unknown'] }));\nreturn [{ json: { ...ctx, validated_questions: keep, rejected, validator_verdict: verdict } }];"
-      }
-    },
-
-    {
-      "id": "node_dedupe",
-      "name": "Deduplicate vs Bank",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [820, -160],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nconst existing = (ctx.existing_stems || []).map(s => s.toLowerCase().replace(/\\s+/g,' ').trim());\nconst seen = new Set();\nconst norm = s => s.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\\s+/g,' ').trim();\nfunction trigrams(s){ const t=norm(s); const g=new Set(); for(let i=0;i<=t.length-3;i++) g.add(t.slice(i,i+3)); return g; }\nfunction jaccard(a,b){ const A=trigrams(a), B=trigrams(b); if(!A.size||!B.size) return 0; let inter=0; for(const x of A) if(B.has(x)) inter++; return inter/(A.size+B.size-inter); }\nconst threshold = 0.85;\nconst unique = [];\nconst dropped = [];\nfor (const q of (ctx.validated_questions||[])) {\n  const stem = q.question || q.passage || '';\n  const nstem = norm(stem);\n  if (seen.has(nstem)) { dropped.push({id:q.question_id, reason:'duplicate_in_batch'}); continue; }\n  let dup = false;\n  for (const e of existing) { if (jaccard(stem, e) >= threshold) { dup = true; break; } }\n  if (dup) { dropped.push({id:q.question_id, reason:'duplicate_vs_bank'}); continue; }\n  seen.add(nstem);\n  unique.push(q);\n}\nreturn [{ json: { ...ctx, unique_questions: unique, dropped_duplicates: dropped } }];"
-      }
-    },
-
-    {
-      "id": "node_should_regen",
-      "name": "Need Regeneration?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1040, -160],
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "typeValidation": "strict" },
-          "combinator": "and",
-          "conditions": [
-            { "id": "c1", "operator": { "type": "number", "operation": "lt" },
-              "leftValue": "={{ ($json.unique_questions || []).length }}",
-              "rightValue": "={{ $json.number_of_questions }}" },
-            { "id": "c2", "operator": { "type": "number", "operation": "lt" },
-              "leftValue": "={{ $json.attempt }}",
-              "rightValue": "={{ $vars.MAX_REGEN_ATTEMPTS }}" }
-          ]
-        }
-      }
-    },
-
-    {
-      "id": "node_prepare_regen",
-      "name": "Prepare Regeneration Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1040, 60],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nconst remaining = ctx.number_of_questions - (ctx.unique_questions||[]).length;\nconst existing_stems = [...(ctx.existing_stems||[]), ...(ctx.unique_questions||[]).map(q=>q.question||q.passage||'')];\nreturn [{ json: { ...ctx, number_of_questions: remaining, existing_stems, kept_questions: ctx.unique_questions } }];"
-      }
-    },
-
-    {
-      "id": "node_finalize",
-      "name": "Finalize JSON",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1260, -260],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nconst all = [...(ctx.kept_questions||[]), ...(ctx.unique_questions||[])];\n// Re-id sequentially to keep ids tidy.\nconst diff = ctx.difficulty_code;\nconst tcode = ctx.question_type === 'CASE_STUDY' ? 'CS' : ctx.question_type;\nconst seen = new Set();\nconst questions = [];\nlet i = 1;\nfor (const q of all) {\n  const key = (q.question || q.passage || '').toLowerCase().replace(/\\s+/g,' ').trim();\n  if (seen.has(key)) continue; seen.add(key);\n  q.question_id = `${ctx.chapter_code}_${tcode}_${diff}_${String(i).padStart(3,'0')}`;\n  i++; questions.push(q);\n}\nconst out = {\n  board: ctx.board,\n  class: ctx.class_name,\n  chapter: ctx.chapter,\n  source_type: ctx.source_type,\n  question_type: ctx.question_type,\n  difficulty: ctx.difficulty,\n  language: ctx.language,\n  include_visual_questions: ctx.include_visual_questions,\n  generate_explanation: ctx.generate_explanation,\n  question_count: questions.length,\n  generated_at: new Date().toISOString(),\n  batch_id: ctx.batch_id,\n  questions\n};\nconst fname = `${ctx.chapter.replace(/[^A-Za-z0-9]+/g,'_')}_${ctx.question_type}_${ctx.difficulty}_${ctx.batch_id}.json`;\nreturn [{ json: { ...ctx, final_payload: out, file_name: fname } }];"
-      }
-    },
-
-    {
-      "id": "node_ensure_folders",
-      "name": "Ensure Drive Folders",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-500, 200],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "// Resolves Board / Class / Chapter / Type / Difficulty folder ids under root 'Question Bank',\n// creating any missing folders via the Google Drive API using the OAuth credential\n// configured at workflow level via $vars.GOOGLE_DRIVE_OAUTH_TOKEN (refreshed by sub-workflow).\n// In practice, prefer the 'Google Drive: Folder' sub-workflow node — this Code node is the fallback.\nconst ctx = $json;\nconst rootName = $vars.DRIVE_ROOT || 'Question Bank';\nconst path = [rootName, ctx.board, ctx.class_name, ctx.chapter, ctx.question_type, ctx.difficulty];\n\nasync function findOrCreate(name, parentId) {\n  const q = encodeURIComponent(`name='${name.replace(/'/g, \"\\\\'\")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`);\n  const list = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'GET', url: `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, json: true\n  });\n  if (list.files && list.files.length) return list.files[0].id;\n  const created = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'POST', url: 'https://www.googleapis.com/drive/v3/files',\n    body: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }, json: true\n  });\n  return created.id;\n}\n\nlet parent = 'root';\nconst trail = [];\nfor (const seg of path) {\n  parent = await findOrCreate.call(this, seg, parent);\n  trail.push({ name: seg, id: parent });\n}\nreturn [{ json: { ...ctx, drive_folder_trail: trail, target_folder_id: parent } }];"
-      },
-      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
-    },
-
-    {
-      "id": "node_collect_existing_stems",
-      "name": "Collect Existing Stems",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [-60, 160],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "// Pulls up to N recent files from the target Drive folder, downloads them, extracts question stems.\nconst ctx = $('Attach Knowledge Object').first().json;\nconst lookback = parseInt($vars.DUP_LOOKBACK || '20', 10);\nconst files = ($input.all() || []).flatMap(i => i.json.files || []).slice(0, lookback);\nconst stems = [];\nfor (const f of files) {\n  try {\n    const data = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n      method: 'GET', url: `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`, json: true\n    });\n    for (const q of (data.questions || [])) {\n      const s = q.question || q.passage; if (s) stems.push(s);\n    }\n  } catch (e) { /* ignore broken files */ }\n}\nreturn [{ json: { ...ctx, target_folder_id: $('Ensure Drive Folders').first().json.target_folder_id, existing_stems: stems } }];"
-      },
-      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
-    },
-
-    {
-      "id": "node_to_binary",
-      "name": "JSON → Binary",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1480, -260],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nconst buffer = Buffer.from(JSON.stringify(ctx.final_payload, null, 2), 'utf8');\nreturn [{ json: ctx, binary: { data: { data: buffer.toString('base64'), mimeType: 'application/json', fileName: ctx.file_name } } }];"
-      }
-    },
-
-    {
-      "id": "node_upload_drive",
-      "name": "Upload to Google Drive",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [1700, -260],
-      "parameters": {
-        "operation": "upload",
-        "name": "={{ $json.file_name }}",
+        "resource": "folder",
+        "name": "={{ $('On form submission').item.json.Board }}-{{ $('On form submission').item.json.Class }}-{{ $('On form submission').item.json.Subject }}-Ch-{{ $('On form submission').item.json['Chapter No (e.g. 1,2,3)'] }}-{{ $('On form submission').item.json['Chapter Name'] }}-Co-{{ $('On form submission').item.json['Concept No'] }}-{{ $('On form submission').item.json['Concept Name'] }}",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.target_folder_id }}" },
-        "binaryPropertyName": "data",
-        "options": { "fields": "id,name,webViewLink,parents" }
+        "folderId": { "__rl": true, "value": "={{ $json['Folder URL'] }}", "mode": "url" },
+        "options": { "folderColorRgb": "#00F2FF" }
       },
-      "credentials": { "googleDriveOAuth2Api": { "id": "google_drive_oauth_credential", "name": "Google Drive OAuth2" } }
+      "id": "n_create_root",
+      "name": "Create Root Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-1380, 0],
+      "retryOnFail": true,
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_DRIVE_CRED_ID", "name": "Google Drive OAuth2" } }
     },
 
     {
-      "id": "node_log_summary",
-      "name": "Log Run Summary",
+      "parameters": {
+        "jsCode": "// Reads the 18 hidden prompt fields from the form submission and reshapes them\n// into [{ level, items: [{ type, prompt }, ...] }] — one item per (level x type).\nconst formSubmissions = $(\"On form submission\").all();\n\nconst levels = [\"EASY\", \"MEDIUM\", \"HARD\"];\nconst formats = [\"MCQ\", \"VSA\", \"SA\", \"LA\", \"A&R\", \"CASE_STUDY\"];\n\nconst output = levels.map(level => {\n  const items = formats.map(format => {\n    const key = `${level} ${format}`;\n    const submission = formSubmissions.find(s => s && s.json && s.json[key]);\n    return { type: format, prompt: submission ? submission.json[key] : null };\n  });\n  return { level, items };\n});\n\nreturn output.map(o => ({ json: o }));\n"
+      },
+      "id": "n_generate_prompts",
+      "name": "Generate 18 Question Prompts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1920, -260],
-      "parameters": {
-        "language": "javaScript",
-        "jsCode": "const ctx = $json;\nreturn [{ json: {\n  status: 'OK',\n  batch_id: ctx.batch_id,\n  prompt_key: ctx.prompt_key,\n  chapter: ctx.chapter,\n  saved_file: ctx.file_name,\n  questions_saved: ctx.final_payload.question_count,\n  rejected_by_validator: (ctx.rejected || []).length,\n  dropped_duplicates: (ctx.dropped_duplicates || []).length,\n  drive_folder_trail: ctx.drive_folder_trail,\n  attempts: ctx.attempt\n}}];"
-      }
+      "position": [-1160, 0],
+      "alwaysOutputData": true,
+      "retryOnFail": true
     },
 
     {
-      "id": "node_error_handler",
-      "name": "Error Branch",
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $json.level }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "={{ $('Create Root Folder').item.json.id }}", "mode": "id" },
+        "options": {}
+      },
+      "id": "n_create_level",
+      "name": "Create Level Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-940, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_DRIVE_CRED_ID", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "parameters": { "options": { "reset": true } },
+      "id": "n_outer_loop",
+      "name": "Loop Over 18 Items (Outer)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-720, 0],
+      "retryOnFail": true
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// On each outer-loop iteration this expands the current level's 6 (type, prompt) pairs\n// and attaches the matching Drive level-folder id.\nconst levelIndex = $runIndex;\nconst levelsNode = $('Generate 18 Question Prompts').all();\nif (!levelsNode[levelIndex]) {\n  // Signal end of outer loop.\n  return [];\n}\nconst { level, items } = levelsNode[levelIndex].json;\n\nconst foldersNode = $('Create Level Folder').all();\nconst folder = foldersNode[levelIndex];\nif (!folder || !folder.json || !folder.json.id) return [];\nconst folderId = folder.json.id;\n\nif (!Array.isArray(items) || items.length === 0) return [];\n\nreturn items.map(it => ({\n  json: {\n    level,\n    parentFolderId: folderId,\n    questionType: it.type,\n    prompt: it.prompt\n  }\n}));\n"
+      },
+      "id": "n_expand_level",
+      "name": "Expand Level → Types",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, 360],
+      "position": [-500, 80],
+      "alwaysOutputData": true
+    },
+
+    {
       "parameters": {
-        "language": "javaScript",
-        "jsCode": "const err = $json.error || $json;\nreturn [{ json: { status: 'FAILED', stage: $json.node || 'unknown', message: err.message || String(err), batch_id: $('Normalize Input').first()?.json?.batch_id } }];"
-      }
+        "resource": "folder",
+        "name": "={{ $json.questionType === 'A&R' ? 'AR' : $json.questionType }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "={{ $json.parentFolderId }}", "mode": "id" },
+        "options": {}
+      },
+      "id": "n_create_type",
+      "name": "Create Type Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-280, 80],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_DRIVE_CRED_ID", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "questionPrompt", "value": "={{ $('Expand Level → Types').item.json.prompt }}", "type": "string" },
+            { "id": "a2", "name": "driveid",        "value": "={{ $json.id }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n_set",
+      "name": "Pack Prompt + Drive ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-60, 80]
+    },
+
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "REPLACE_SUB_WORKFLOW_ID", "mode": "id" },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Board":          "={{ $('On form submission').item.json.Board }}",
+            "Class":          "={{ $('On form submission').item.json.Class }}",
+            "Subject":        "={{ $('On form submission').item.json.Subject }}",
+            "Chapter Number": "={{ $('On form submission').item.json['Chapter No (e.g. 1,2,3)'] }}",
+            "Chapter Name":   "={{ $('On form submission').item.json['Chapter Name'] }}",
+            "Concept Number": "={{ $('On form submission').item.json['Concept No'] }}",
+            "Concept Name":   "={{ $('On form submission').item.json['Concept Name'] }}",
+            "questionLevel":  "={{ $('Expand Level → Types').item.json.level }}",
+            "questionType":   "={{ $('Expand Level → Types').item.json.questionType }}",
+            "questionPrompt": "={{ $json.questionPrompt }}",
+            "driveid":        "={{ $json.driveid }}"
+          },
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "n_call_sub",
+      "name": "Call: QuestDrive Sub-Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [160, 80]
+    },
+
+    {
+      "parameters": { "aggregate": "aggregateAllItemData", "options": {} },
+      "id": "n_agg",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [160, -120]
+    },
+
+    {
+      "parameters": {
+        "sendTo": "team@nextleap.ai",
+        "subject": "Chemistry Mock Test Generated",
+        "message": "=<!DOCTYPE html><html><body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333;\"><h2 style=\"color: #2c7be5;\">✅ Chemistry Mock Test Generated</h2><p>Generation finished for:</p><p style=\"font-size: 16px; font-weight: bold;\">{{ $('On form submission').item.json.Board }}-{{ $('On form submission').item.json.Class }}-{{ $('On form submission').item.json.Subject }}-Ch-{{ $('On form submission').item.json['Chapter No (e.g. 1,2,3)'] }}-{{ $('On form submission').item.json['Chapter Name'] }}-Co-{{ $('On form submission').item.json['Concept No'] }}-{{ $('On form submission').item.json['Concept Name'] }}</p><hr><p>Folder: {{ $('On form submission').item.json['Folder URL'] }}</p><p>Files were created under: <code>{{ $('Create Root Folder').item.json.name }}</code></p><p>Regards,<br><strong>NextLeap Chemistry Automation</strong></p></body></html>",
+        "options": {}
+      },
+      "id": "n_email",
+      "name": "Send Completion Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [380, -120],
+      "webhookId": "chemistry-email",
+      "retryOnFail": true,
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail OAuth2" } }
     }
   ],
 
   "connections": {
-    "Form: User Input":            { "main": [[{ "node": "Normalize Input", "type": "main", "index": 0 }]] },
-    "Normalize Input":             { "main": [[{ "node": "Extract PDF Text", "type": "main", "index": 0 }]] },
-    "Extract PDF Text":            { "main": [[{ "node": "Clean PDF Text", "type": "main", "index": 0 }]] },
-    "Clean PDF Text":              { "main": [[{ "node": "Structure Chapter Knowledge", "type": "main", "index": 0 }]] },
-    "Structure Chapter Knowledge": { "main": [[{ "node": "Attach Knowledge Object", "type": "main", "index": 0 }]] },
-    "Attach Knowledge Object":     { "main": [[{ "node": "Ensure Drive Folders", "type": "main", "index": 0 }]] },
-    "Ensure Drive Folders":        { "main": [[{ "node": "Load Existing Question Bank", "type": "main", "index": 0 }]] },
-    "Load Existing Question Bank": { "main": [[{ "node": "Collect Existing Stems", "type": "main", "index": 0 }]] },
-    "Collect Existing Stems":      { "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]] },
-    "Build Prompt":                { "main": [[{ "node": "AI: Generate Questions", "type": "main", "index": 0 }]] },
-    "AI: Generate Questions":      { "main": [[{ "node": "Parse Generation", "type": "main", "index": 0 }]] },
-    "Parse Generation":            { "main": [[{ "node": "AI: Validate Questions", "type": "main", "index": 0 }]] },
-    "AI: Validate Questions":      { "main": [[{ "node": "Filter Valid Questions", "type": "main", "index": 0 }]] },
-    "Filter Valid Questions":      { "main": [[{ "node": "Deduplicate vs Bank", "type": "main", "index": 0 }]] },
-    "Deduplicate vs Bank":         { "main": [[{ "node": "Need Regeneration?", "type": "main", "index": 0 }]] },
-    "Need Regeneration?":          { "main": [
-                                        [{ "node": "Prepare Regeneration Context", "type": "main", "index": 0 }],
-                                        [{ "node": "Finalize JSON", "type": "main", "index": 0 }]
-                                      ] },
-    "Prepare Regeneration Context":{ "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]] },
-    "Finalize JSON":               { "main": [[{ "node": "JSON → Binary", "type": "main", "index": 0 }]] },
-    "JSON → Binary":               { "main": [[{ "node": "Upload to Google Drive", "type": "main", "index": 0 }]] },
-    "Upload to Google Drive":      { "main": [[{ "node": "Log Run Summary", "type": "main", "index": 0 }]] }
+    "On form submission":            { "main": [[{ "node": "Create Root Folder", "type": "main", "index": 0 }]] },
+    "Create Root Folder":            { "main": [[{ "node": "Generate 18 Question Prompts", "type": "main", "index": 0 }]] },
+    "Generate 18 Question Prompts":  { "main": [[{ "node": "Create Level Folder", "type": "main", "index": 0 }]] },
+    "Create Level Folder":           { "main": [[{ "node": "Loop Over 18 Items (Outer)", "type": "main", "index": 0 }]] },
+    "Loop Over 18 Items (Outer)":    { "main": [
+                                          [{ "node": "Aggregate", "type": "main", "index": 0 }],
+                                          [{ "node": "Expand Level → Types", "type": "main", "index": 0 }]
+                                        ] },
+    "Expand Level → Types":          { "main": [[{ "node": "Create Type Folder", "type": "main", "index": 0 }]] },
+    "Create Type Folder":            { "main": [[{ "node": "Pack Prompt + Drive ID", "type": "main", "index": 0 }]] },
+    "Pack Prompt + Drive ID":        { "main": [[{ "node": "Call: QuestDrive Sub-Workflow", "type": "main", "index": 0 }]] },
+    "Call: QuestDrive Sub-Workflow": { "main": [[{ "node": "Loop Over 18 Items (Outer)", "type": "main", "index": 0 }]] },
+    "Aggregate":                     { "main": [[{ "node": "Send Completion Email", "type": "main", "index": 0 }]] }
   },
 
-  "staticData": null,
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true, "saveManualExecutions": true },
+  "active": false,
+  "tags": [ { "name": "Chemistry" }, { "name": "CBSE" }, { "name": "Question Bank" } ],
   "pinData": {},
-  "versionId": "1.0.0",
-  "triggerCount": 1,
-
-  "_environment_variables_required": {
-    "GENERATOR_SYSTEM_PROMPT": "Contents of prompts/system-base.txt",
-    "STRUCTURER_PROMPT": "Contents of prompts/structurer.txt",
-    "VALIDATOR_PROMPT": "Contents of prompts/validator.txt",
-    "PROMPT_TEMPLATES": "Contents of prompts/templates.json (as a JSON string)",
-    "DRIVE_ROOT": "Question Bank",
-    "DUP_LOOKBACK": "20",
-    "MAX_REGEN_ATTEMPTS": "3"
-  },
-
-  "_credentials_required": {
-    "anthropicApi": "Anthropic API credential for Claude (used by Structurer, Generator, Validator)",
-    "googleDriveOAuth2Api": "Google Drive OAuth2 credential with drive.file scope"
-  }
+  "meta": { "templateCredsSetupCompleted": false }
 }

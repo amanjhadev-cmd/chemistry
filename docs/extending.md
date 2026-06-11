@@ -1,102 +1,77 @@
 # Extending the platform
 
-Each extension below is intentionally a small, localised change — the workflow graph stays the same.
-
-## Add a new chapter
-
-1. `config/config.json#chapters.<class>` → append the chapter title.
-2. Form trigger → add the chapter to the `Chapter Name` dropdown values.
-
-No workflow surgery, no prompt changes.
+The MockGenie / QuestDrive pattern keeps each extension to a small, local change.
 
 ## Add a new question type
 
-E.g. `COMPETENCY`.
+E.g. `NUMERICAL`.
 
-1. `config/config.json#supported.question_types` → append `COMPETENCY`.
-2. Form trigger → add `COMPETENCY` to the `Question Type` dropdown.
-3. `prompts/templates.json` → add three keys:
-   - `COMPETENCY_EASY`
-   - `COMPETENCY_MEDIUM`
-   - `COMPETENCY_HARD`
-4. Drive layout → the `Ensure Drive Folders` node walks the path from the envelope; the new folder will be created on first run automatically.
+1. **Form trigger** → add 3 hidden fields: `EASY NUMERICAL`, `MEDIUM NUMERICAL`, `HARD NUMERICAL` with their prompts.
+2. **`Generate 18 Question Prompts` (Code)** → in `const formats`, append `"NUMERICAL"`. Loop count becomes 21.
+3. **`Loop Over 18 Items (Outer)`** → no change (it iterates over `levels`, count is still 3).
+4. **Sub-workflow `Extract QuestionType`** → add a branch in the inference fallback if you ever skip explicit `questionType`.
+5. **Sub-workflow `Parse LLM HTML`** → if the new type's output structure differs, add a parser branch (mirror the `parseWritten` / `parseMcqLike` / `parseCaseStudy` pattern).
 
-`prompt_key = `${question_type}_${difficulty}`` already includes the new value — no Code edits.
+No connections change. No Switch node to refactor.
 
 ## Add a new board
 
-E.g. `ICSE`.
+Just dropdown values:
 
-1. `config/config.json#supported.boards` → append `ICSE`.
+1. `config/config.json#supported.boards` — append.
 2. Form trigger → add to `Board` dropdown.
-3. `prompts/templates.json` — *optional*: add ICSE-style overrides. The cleanest way is to keep CBSE templates as the default and add an `_overrides.ICSE` block looked up by `Build Prompt`:
 
-   ```js
-   const base = templates[ctx.prompt_key];
-   const override = templates._overrides?.[ctx.board]?.[ctx.prompt_key];
-   const entry = { ...base, ...(override || {}) };
-   ```
-
-4. The structurer is board-agnostic — no change.
+Prompts are board-agnostic in this build. If you want board-specific phrasing (e.g. ICSE markschemes), add an `Override Prompt by Board` Code node between `Pack Prompt + Drive ID` and `Call: QuestDrive Sub-Workflow` that swaps in the right text.
 
 ## Add a new subject (Physics, Biology)
 
-Subjects diverge much more than boards do. The right move is to clone the workflow and swap:
+Subjects diverge enough that the cleanest path is to **clone the main workflow** and rewrite the 18 hidden prompts. The sub-workflow stays as-is — it's subject-agnostic. Folder tree is identical.
 
-- `prompts/system-base.txt` — subject-specific authoring rules.
-- `prompts/templates.json` — subject-specific instructions per (type × difficulty).
-- `config/config.json#chapters` — subject's syllabus.
-- Form trigger title and chapter dropdown.
+## Add a new language (Hindi)
 
-The pipeline (PDF → clean → structure → route → generate → validate → dedupe → save) is unchanged.
-
-## Add Hindi (or any other language)
-
-1. `config/config.json#feature_flags.enable_hindi` → `true`.
-2. `config/config.json#supported.languages` → append `Hindi`.
-3. Form trigger → add `Hindi` to the `Language` dropdown.
-4. `prompts/system-base.hi.txt` → Hindi translation of the system prompt, plus an instruction to emit Devanagari output.
-5. `Build Prompt` → already injects `language` into the user message; extend it to switch system prompt by language:
-
-   ```js
-   const sys = ctx.language === 'Hindi' ? $vars.GENERATOR_SYSTEM_PROMPT_HI : $vars.GENERATOR_SYSTEM_PROMPT;
-   return [{ json: { ...ctx, prompt_user_message: body, system_prompt: sys, attempt: ... } }];
-   ```
-
-   And on the AI nodes, change the `system` expression to `={{ $json.system_prompt }}`.
+1. `config/config.json#supported.languages` — append `Hindi`.
+2. **Form trigger** → add a visible `Language` dropdown.
+3. **Hidden fields** → duplicate the 18 prompts as `EASY MCQ HI`, etc., with Hindi instructions and Devanagari output expectation.
+4. **`Generate 18 Question Prompts`** → read the language and pick the matching field set.
 
 ## JEE / NEET mode
 
-These exams demand harder distractors, longer numerical chains, and out-of-NCERT-but-syllabus content.
+Add a visible `Exam Mode` dropdown (`BOARDS | JEE | NEET`) and three more prompt sets, or — simpler — append exam-specific extra rules at the end of every prompt via a Code node:
 
-1. Form trigger → add `Exam Mode` dropdown with `BOARDS` (default), `JEE`, `NEET`.
-2. `prompts/templates.json` → add an `_exam_overlays` block:
+```js
+const overlay = $json.examMode === 'JEE'
+  ? '\nADDITIONAL RULES (JEE OVERLAY): multi-step numericals, IIT-style traps...'
+  : '';
+return [{ json: { ...$json, questionPrompt: $json.questionPrompt + overlay } }];
+```
 
-   ```json
-   {
-     "JEE": { "MCQ_HARD": { "extra_rules": ["At least 2 multi-step numericals", "Use IIT-style distractor patterns"] } },
-     "NEET": { "MCQ_HARD": { "extra_rules": ["Single-correct, fact-dense", "Stay within NEET syllabus"] } }
-   }
-   ```
-
-3. `Build Prompt` — append `extra_rules` to the rules list when `exam_mode !== 'BOARDS'`.
-4. `config/config.json#feature_flags.enable_jee_mode` / `enable_neet_mode`.
-
-## HOTS / competency-based
-
-Treat them as either a new question_type (recommended — clean Drive separation) or as a difficulty tier above `HARD`. The former is the smaller change.
-
-## Multi-chapter / topic-wise
-
-1. Form trigger → make `Reference PDF` multi-file and add `Topics` (free text).
-2. After `Extract PDF Text`, add a Split-out / loop so each PDF gets cleaned and structured.
-3. After `Attach Knowledge Object`, add a merge that combines the per-chapter knowledge objects.
-4. The rest of the pipeline is unchanged.
+Insert it between `Pack Prompt + Drive ID` and `Call: QuestDrive Sub-Workflow`.
 
 ## Swap LLM provider
 
-Change `modelId` and the credential on the three AI nodes (`Structure Chapter Knowledge`, `AI: Generate Questions`, `AI: Validate Questions`). The prompts are provider-neutral.
+In the sub-workflow:
+1. Replace `Qwen3-Instruct` with the provider's chat node (`anthropicChat`, `openAi`, etc.).
+2. Bind the credential.
+3. Done — the prompts are provider-neutral.
 
-## Swap dedupe to embeddings
+## Add a validator pass
 
-Replace the body of `Deduplicate vs Bank` with embedding lookups against a vector store. Inputs and outputs (`unique_questions`, `dropped_duplicates`) stay the same, so nothing downstream changes.
+In the sub-workflow, between `Parse LLM HTML` and `Convert to JSON File`:
+1. Add an Agent node with a strict validator system prompt.
+2. Add a Code node that drops `questionHtml` entries whose validator verdict was `valid:false`.
+
+The shape that flows into `Convert to JSON File` is the same — no further changes.
+
+## Add dedupe across runs
+
+In the sub-workflow, before upload:
+1. List the existing files in `$json.driveid` (Drive: list).
+2. Download up to N recent ones.
+3. Code node: trigram Jaccard ≥ 0.85 against `question_text`; drop matches.
+
+## Multi-chapter / multi-concept
+
+The form already accepts one PDF and one concept. For multi-concept generation:
+1. Make `Reference Document` multi-file and `Concept Name / No` text-area accepting CSV.
+2. Add a Code node after `On form submission` that splits into one item per (PDF, concept) pair.
+3. The rest of the pipeline (folder creation, outer loop, sub-workflow) is unchanged — each pair lands in its own root folder.
