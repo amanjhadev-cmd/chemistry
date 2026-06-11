@@ -1,0 +1,251 @@
+{
+  "name": "Chemistry Question Generation Platform — Phase 1: Knowledge Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Chemistry — Phase 1: Knowledge Extraction",
+        "formDescription": "Uploads a chapter PDF and produces a structured CHAPTER_KNOWLEDGE.json on Google Drive. Phase 1 does NOT generate questions — it only extracts, cleans, and structures the chapter knowledge. All 11 form fields are stored on the output so later phases can reuse them.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Board", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "CBSE" } ] } },
+            { "fieldLabel": "Class", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "Class XI" }, { "option": "Class XII" } ] } },
+            { "fieldLabel": "Chapter Name", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "Some Basic Concepts of Chemistry" },
+                { "option": "Structure of Atom" },
+                { "option": "Classification of Elements and Periodicity in Properties" },
+                { "option": "Chemical Bonding and Molecular Structure" },
+                { "option": "Thermodynamics" },
+                { "option": "Equilibrium" },
+                { "option": "Redox Reactions" },
+                { "option": "Organic Chemistry - Some Basic Principles and Techniques" },
+                { "option": "Hydrocarbons" },
+                { "option": "Solutions" },
+                { "option": "Electrochemistry" },
+                { "option": "Chemical Kinetics" },
+                { "option": "The d- and f-Block Elements" },
+                { "option": "Coordination Compounds" },
+                { "option": "Haloalkanes and Haloarenes" },
+                { "option": "Alcohols, Phenols and Ethers" },
+                { "option": "Aldehydes, Ketones and Carboxylic Acids" },
+                { "option": "Amines" },
+                { "option": "Biomolecules" }
+              ] } },
+            { "fieldLabel": "Source Type", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "NCERT" }, { "option": "Reference Book" }, { "option": "Teacher Notes" },
+                { "option": "PYQ Collection" }, { "option": "Mixed" } ] } },
+            { "fieldLabel": "Reference PDF", "fieldType": "file", "requiredField": true, "acceptFileTypes": ".pdf", "multipleFiles": false },
+
+            { "fieldLabel": "Question Type", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [
+                { "option": "MCQ" }, { "option": "VSA" }, { "option": "SA" },
+                { "option": "LA" }, { "option": "AR" }, { "option": "CASE_STUDY" } ] } },
+            { "fieldLabel": "Difficulty", "fieldType": "dropdown", "requiredField": true,
+              "fieldOptions": { "values": [ { "option": "EASY" }, { "option": "MEDIUM" }, { "option": "HARD" } ] } },
+
+            { "fieldLabel": "Number of Questions", "fieldType": "number", "requiredField": false, "placeholder": "10" },
+            { "fieldLabel": "Include Visual Questions", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "NO" }, { "option": "YES" } ] } },
+            { "fieldLabel": "Language", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "English" } ] } },
+            { "fieldLabel": "Generate Explanation", "fieldType": "dropdown", "requiredField": false,
+              "fieldOptions": { "values": [ { "option": "YES" }, { "option": "NO" } ] } },
+
+            { "fieldName": "SYSTEM_STRUCTURER", "fieldType": "hiddenField",
+              "fieldValue": "You are a chemistry chapter structurer. Given the cleaned text of one CBSE chemistry chapter you must output STRICT JSON only — no prose, no markdown, no code fences — matching this schema EXACTLY:\n\n{\n  \"chapter_title\": string,                  // exact title as it appears\n  \"topics\": [string],                         // major topics, in reading order\n  \"subtopics\": [{ \"topic\": string, \"name\": string, \"summary\": string }],\n  \"definitions\": [{ \"term\": string, \"definition\": string, \"topic\": string }],\n  \"formulae\": [{ \"name\": string, \"expression\": string, \"variables\": string, \"topic\": string }],\n  \"laws\": [{ \"name\": string, \"statement\": string, \"topic\": string }],\n  \"principles\": [{ \"name\": string, \"statement\": string, \"topic\": string }],\n  \"reactions\": [{ \"name\": string, \"equation\": string, \"conditions\": string, \"topic\": string }],\n  \"examples\": [{ \"title\": string, \"summary\": string, \"working\": string, \"topic\": string }],\n  \"tables\": [{ \"label\": string, \"summary\": string, \"rows\": [string], \"topic\": string }],\n  \"graph_references\": [{ \"label\": string, \"describes\": string, \"topic\": string }],\n  \"diagram_references\": [{ \"label\": string, \"describes\": string, \"topic\": string }],\n  \"important_facts\": [{ \"fact\": string, \"topic\": string }],\n  \"exceptions\": [{ \"rule\": string, \"exception\": string, \"topic\": string }],\n  \"ncert_activities\": [{ \"label\": string, \"summary\": string, \"topic\": string }]\n}\n\nRULES:\n- Use ONLY content found in the supplied cleaned text. Never invent facts, constants, or examples.\n- Preserve exact NCERT terminology, IUPAC names, SI units, and numerical values.\n- Preserve chemistry notation in plain text using NCERT conventions (H2O, H2SO4, [Cu(NH3)4]2+, Δ, →, ⇌, °C, mol·L⁻¹).\n- Keep formulae and reactions on a single line; do not introduce LaTeX.\n- For every entry, set the `topic` field to the closest matching item in `topics` (or empty string if uncertain).\n- If a section is absent in the chapter, return an empty array — do not omit the key.\n- Do not summarise the entire chapter into a single blob; decompose into the arrays above.\n- Do not include headers, page numbers, copyright notices, or layout artefacts.\n- Output must parse with JSON.parse on the first try." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n_form",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [-1800, 0],
+      "webhookId": "phase1-knowledge-extraction"
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Coerces the 11 form fields, builds identifiers, stamps batch metadata.\n// All field values are preserved on the envelope so Phase 2+ can reuse them.\nconst f = $input.first().json;\nconst num = parseInt(f['Number of Questions'], 10);\nconst typeRaw = f['Question Type'];\nconst typeFolder = typeRaw === 'A&R' ? 'AR' : typeRaw;\nconst typeOut = typeFolder === 'AR' ? 'A&R' : typeFolder;\n\nconst batchId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);\nconst chapterCode = (f['Chapter Name'] || 'CHAPTER')\n  .toUpperCase()\n  .replace(/[^A-Z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .slice(0, 24);\n\nreturn [{\n  json: {\n    // --- echoed inputs (preserved verbatim for Phase 2+) ---\n    board: f['Board'],\n    class_name: f['Class'],\n    chapter: f['Chapter Name'],\n    source_type: f['Source Type'],\n    question_type: typeOut,\n    question_type_folder: typeFolder,\n    difficulty: f['Difficulty'],\n    number_of_questions: Number.isFinite(num) && num > 0 ? num : 10,\n    include_visual_questions: (f['Include Visual Questions'] || 'NO').toUpperCase() === 'YES',\n    language: f['Language'] || 'English',\n    generate_explanation: (f['Generate Explanation'] || 'YES').toUpperCase() === 'YES',\n\n    // --- derived identifiers ---\n    chapter_code: chapterCode,\n    batch_id: batchId,\n    started_at: new Date().toISOString(),\n    knowledge_file_name: `${chapterCode}_KNOWLEDGE.json`,\n\n    // --- system prompt carried through (hidden form field) ---\n    system_structurer: f['SYSTEM_STRUCTURER']\n  },\n  binary: $input.first().binary\n}];"
+      },
+      "id": "n_normalize",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1580, 0]
+    },
+
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Reference_PDF",
+        "options": { "joinPages": true, "keepSource": "binary" }
+      },
+      "id": "n_extract_pdf",
+      "name": "Extract PDF Text & Metadata",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [-1360, 0],
+      "continueOnFail": false,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "Joins all pages into $json.text and exposes PDF metadata (numpages, info, version) on $json. Retries 3× on transient parser failures."
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Reads $json.text + PDF metadata from the previous node. Produces cleaned text\n// and a small pdf_metadata object that goes into the final JSON.\nconst ctx = $('Normalize Input').first().json;\nconst raw = ($json.text || '').toString();\nconst meta = {\n  num_pages: $json.numpages ?? $json.info?.NumPages ?? null,\n  info:       $json.info ?? {},\n  version:    $json.version ?? null,\n  raw_chars:  raw.length\n};\n\n// 1) Remove explicit page-number markers and standalone numeric lines.\nlet t = raw.replace(/Page\\s+\\d+\\s+of\\s+\\d+/gi, '');\nt = t.split('\\n').filter(l => !/^\\s*\\d{1,3}\\s*$/.test(l)).join('\\n');\n\n// 2) Strip repeating headers/footers (lines appearing >5 times verbatim).\nconst freq = new Map();\nt.split('\\n').forEach(l => {\n  const k = l.trim();\n  if (k.length > 0 && k.length < 100) freq.set(k, (freq.get(k) || 0) + 1);\n});\nconst boilerplate = new Set([...freq].filter(([, c]) => c > 5).map(([k]) => k));\nt = t.split('\\n').filter(l => !boilerplate.has(l.trim())).join('\\n');\n\n// 3) Strip the chapter title if it repeats on every page top.\nconst titleCandidates = [...freq]\n  .filter(([k, c]) => c >= 3 && k.length < 80 && /^[A-Z][A-Za-z0-9 \\-,'&()]+$/.test(k))\n  .map(([k]) => k);\nfor (const tc of titleCandidates) {\n  t = t.split('\\n').filter(l => l.trim() !== tc || titleCandidates.indexOf(l.trim()) < 0 ? true : false).join('\\n');\n}\n\n// 4) Fix OCR / PDF line-wrap artefacts.\nt = t.replace(/-\\n(\\w)/g, '$1');             // de-hyphenate end-of-line hyphenation\nt = t.replace(/([a-z,;])\\n([a-z])/g, '$1 $2'); // join mid-sentence wraps\nt = t.replace(/[ \\t]{2,}/g, ' ');\nt = t.replace(/\\n{3,}/g, '\\n\\n');\nt = t.replace(/[\\u0000-\\u0008\\u000B-\\u001F\\u007F]/g, ' ');\n\n// 5) Drop obvious URL / email tracker lines.\nt = t.split('\\n')\n     .filter(l => !/^(https?:|www\\.|email:)/i.test(l.trim()))\n     .join('\\n');\n\n// 6) Repair common chemistry-notation breakages from PDF extraction:\n//    - subscript digits stuck to the next token ('H 2 O' -> 'H2O')\n//    - degree sign variants ('o C' -> '°C')\n//    - arrow variants ('->'-> '→', '<->'-> '⇌')\nt = t.replace(/\\b([A-Z][a-z]?)\\s+(\\d)\\b/g, '$1$2');\nt = t.replace(/(\\d)\\s+([A-Z][a-z]?)\\b/g, '$1$2');\nt = t.replace(/(\\d)\\s*o\\s*C\\b/g, '$1°C');\nt = t.replace(/<\\s*-\\s*>/g, '⇌').replace(/-\\s*>/g, '→');\n\n// 7) Collapse exact-duplicate adjacent paragraphs.\nconst paras = t.split(/\\n\\n+/);\nconst dedup = [];\nfor (const p of paras) { if (dedup[dedup.length - 1] !== p) dedup.push(p); }\nconst cleaned = dedup.join('\\n\\n').trim();\n\nif (cleaned.length < 200) {\n  throw new Error(`Cleaned text is suspiciously short (${cleaned.length} chars). Check the PDF — it may be scanned-only and need OCR.`);\n}\n\nreturn [{ json: { ...ctx, pdf_metadata: meta, cleaned_text: cleaned } }];"
+      },
+      "id": "n_clean",
+      "name": "Clean PDF Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1140, 0]
+    },
+
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "modelId": "claude-haiku-4-5-20251001",
+        "system": "={{ $json.system_structurer }}",
+        "messages": {
+          "values": [
+            { "role": "user", "content": "=Board: {{$json.board}}\nClass: {{$json.class_name}}\nChapter: {{$json.chapter}}\nSource type: {{$json.source_type}}\n\nCLEANED CHAPTER TEXT (use ONLY this content):\n{{$json.cleaned_text}}" }
+          ]
+        },
+        "options": { "maxTokensToSample": 8000, "temperature": 0 }
+      },
+      "id": "n_structure",
+      "name": "AI: Structure Chapter Knowledge",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1,
+      "position": [-920, 0],
+      "credentials": { "anthropicApi": { "id": "REPLACE_ANTHROPIC_CRED_ID", "name": "Anthropic" } },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "notes": "Single LLM call (Haiku, temperature 0). Produces the structured knowledge object per the schema in SYSTEM_STRUCTURER. Retries once on transient 5xx."
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Robustly extracts the JSON object from the LLM response and attaches it to the envelope.\nconst ctx = $('Clean PDF Text').first().json;\nconst raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '';\nlet cleaned = raw.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/i, '').trim();\n// If the model prefixed prose, try to slice from the first '{' to the last '}'.\nif (cleaned[0] !== '{') {\n  const first = cleaned.indexOf('{');\n  const last = cleaned.lastIndexOf('}');\n  if (first === -1 || last === -1 || last <= first) {\n    throw new Error('Structurer response did not contain a JSON object.');\n  }\n  cleaned = cleaned.slice(first, last + 1);\n}\nlet structured;\ntry { structured = JSON.parse(cleaned); }\ncatch (e) { throw new Error('Structurer returned non-JSON: ' + e.message); }\nreturn [{ json: { ...ctx, structured_knowledge: structured } }];"
+      },
+      "id": "n_parse",
+      "name": "Parse Knowledge JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-700, 0]
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Schema validation — no LLM. Fails loudly if the structurer omitted required arrays or returned wrong types.\nconst ctx = $json;\nconst k = ctx.structured_knowledge || {};\n\nconst REQUIRED_ARRAYS = [\n  'topics', 'subtopics', 'definitions', 'formulae', 'laws', 'principles',\n  'reactions', 'examples', 'tables', 'graph_references', 'diagram_references',\n  'important_facts', 'exceptions', 'ncert_activities'\n];\n\nconst issues = [];\nif (typeof k.chapter_title !== 'string' || k.chapter_title.length === 0) {\n  issues.push('chapter_title missing or not a string');\n}\nfor (const key of REQUIRED_ARRAYS) {\n  if (!Array.isArray(k[key])) issues.push(`${key} must be an array`);\n}\n// Sanity floor — a real CBSE chemistry chapter should yield more than a token of structure.\nconst totalEntries = REQUIRED_ARRAYS.reduce((s, key) => s + (Array.isArray(k[key]) ? k[key].length : 0), 0);\nif (totalEntries < 8) {\n  issues.push(`structured_knowledge looks too sparse (only ${totalEntries} entries across all arrays)`);\n}\n\nif (issues.length) {\n  throw new Error('Knowledge object failed validation:\\n - ' + issues.join('\\n - '));\n}\n\n// Coerce missing optional keys to empty arrays for output stability.\nfor (const key of REQUIRED_ARRAYS) if (!Array.isArray(k[key])) k[key] = [];\n\nreturn [{ json: { ...ctx, structured_knowledge: k, validation: { ok: true, total_entries: totalEntries } } }];"
+      },
+      "id": "n_validate_schema",
+      "name": "Validate Knowledge Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Composes the final on-disk JSON exactly as Phase 1 specifies. All 11 form\n// fields are preserved (under `form_inputs`) so Phase 2 can read them later.\nconst ctx = $json;\nconst k = ctx.structured_knowledge;\n\nconst payload = {\n  board: ctx.board,\n  class: ctx.class_name,\n  chapter: ctx.chapter,\n  source_type: ctx.source_type,\n\n  pdf_metadata: ctx.pdf_metadata || {},\n\n  topics:              k.topics              || [],\n  subtopics:           k.subtopics           || [],\n  definitions:         k.definitions         || [],\n  formulae:            k.formulae            || [],\n  laws:                k.laws                || [],\n  principles:          k.principles          || [],\n  reactions:           k.reactions           || [],\n  examples:            k.examples            || [],\n  tables:              k.tables              || [],\n  graph_references:    k.graph_references    || [],\n  diagram_references:  k.diagram_references  || [],\n  important_facts:     k.important_facts     || [],\n  exceptions:          k.exceptions          || [],\n  ncert_activities:    k.ncert_activities    || [],\n\n  clean_text: ctx.cleaned_text || '',\n\n  // Echoed form values for Phase 2+ consumers.\n  form_inputs: {\n    board: ctx.board,\n    class: ctx.class_name,\n    chapter: ctx.chapter,\n    source_type: ctx.source_type,\n    question_type: ctx.question_type,\n    difficulty: ctx.difficulty,\n    number_of_questions: ctx.number_of_questions,\n    include_visual_questions: ctx.include_visual_questions,\n    language: ctx.language,\n    generate_explanation: ctx.generate_explanation\n  },\n\n  meta: {\n    phase: 1,\n    schema_version: '1.0.0',\n    chapter_code: ctx.chapter_code,\n    batch_id: ctx.batch_id,\n    generated_at: new Date().toISOString(),\n    total_structured_entries: ctx.validation?.total_entries ?? null\n  }\n};\n\nreturn [{ json: { ...ctx, final_payload: payload } }];"
+      },
+      "id": "n_finalize",
+      "name": "Compose Final JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-260, 0]
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Idempotently creates: Question Bank / CBSE / <Class> / <Chapter> / Knowledge Base\n// using the Drive REST API with the OAuth credential bound on this node.\nconst ctx = $json;\nconst path = ['Question Bank', ctx.board, ctx.class_name, ctx.chapter, 'Knowledge Base'];\n\nasync function findOrCreate(name, parentId) {\n  const q = encodeURIComponent(\n    `name='${name.replace(/'/g, \"\\\\'\")}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`\n  );\n  const list = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'GET',\n    url: `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,\n    json: true\n  });\n  if (list.files && list.files.length) return list.files[0].id;\n  const created = await this.helpers.httpRequestWithAuthentication.call(this, 'googleDriveOAuth2Api', {\n    method: 'POST',\n    url: 'https://www.googleapis.com/drive/v3/files',\n    body: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },\n    json: true\n  });\n  return created.id;\n}\n\nlet parent = 'root';\nconst trail = [];\nfor (const seg of path) {\n  parent = await findOrCreate.call(this, seg, parent);\n  trail.push({ name: seg, id: parent });\n}\nreturn [{ json: { ...ctx, drive_folder_trail: trail, target_folder_id: parent } }];"
+      },
+      "id": "n_folders",
+      "name": "Ensure Drive Folders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_DRIVE_CRED_ID", "name": "Google Drive OAuth2" } }
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nconst buffer = Buffer.from(JSON.stringify(ctx.final_payload, null, 2), 'utf8');\nreturn [{\n  json: ctx,\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'application/json',\n      fileName: ctx.knowledge_file_name\n    }\n  }\n}];"
+      },
+      "id": "n_to_binary",
+      "name": "JSON → Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [180, 0]
+    },
+
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "={{ $json.knowledge_file_name }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.target_folder_id }}" },
+        "binaryPropertyName": "data",
+        "options": { "fields": "id,name,webViewLink,parents" }
+      },
+      "id": "n_upload",
+      "name": "Upload Knowledge JSON to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [400, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_DRIVE_CRED_ID", "name": "Google Drive OAuth2" } },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const ctx = $json;\nreturn [{ json: {\n  status: 'OK',\n  phase: 1,\n  batch_id: ctx.batch_id,\n  chapter: ctx.chapter,\n  chapter_code: ctx.chapter_code,\n  saved_file: ctx.knowledge_file_name,\n  drive_file_id: ctx.id,\n  drive_web_view_link: ctx.webViewLink,\n  drive_folder_trail: ctx.drive_folder_trail,\n  pdf_pages: ctx.pdf_metadata?.num_pages,\n  total_structured_entries: ctx.final_payload?.meta?.total_structured_entries,\n  finished_at: new Date().toISOString()\n}}];"
+      },
+      "id": "n_log",
+      "name": "Log Phase 1 Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 0]
+    }
+  ],
+
+  "connections": {
+    "On form submission":            { "main": [[{ "node": "Normalize Input", "type": "main", "index": 0 }]] },
+    "Normalize Input":               { "main": [[{ "node": "Extract PDF Text & Metadata", "type": "main", "index": 0 }]] },
+    "Extract PDF Text & Metadata":   { "main": [[{ "node": "Clean PDF Text", "type": "main", "index": 0 }]] },
+    "Clean PDF Text":                { "main": [[{ "node": "AI: Structure Chapter Knowledge", "type": "main", "index": 0 }]] },
+    "AI: Structure Chapter Knowledge": { "main": [[{ "node": "Parse Knowledge JSON", "type": "main", "index": 0 }]] },
+    "Parse Knowledge JSON":          { "main": [[{ "node": "Validate Knowledge Schema", "type": "main", "index": 0 }]] },
+    "Validate Knowledge Schema":     { "main": [[{ "node": "Compose Final JSON", "type": "main", "index": 0 }]] },
+    "Compose Final JSON":            { "main": [[{ "node": "Ensure Drive Folders", "type": "main", "index": 0 }]] },
+    "Ensure Drive Folders":          { "main": [[{ "node": "JSON → Binary", "type": "main", "index": 0 }]] },
+    "JSON → Binary":                 { "main": [[{ "node": "Upload Knowledge JSON to Drive", "type": "main", "index": 0 }]] },
+    "Upload Knowledge JSON to Drive":{ "main": [[{ "node": "Log Phase 1 Summary", "type": "main", "index": 0 }]] }
+  },
+
+  "settings": { "executionOrder": "v1", "saveExecutionProgress": true, "saveManualExecutions": true },
+  "active": false,
+  "tags": [ { "name": "Chemistry" }, { "name": "Phase 1" }, { "name": "Knowledge Extraction" } ],
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false }
+}

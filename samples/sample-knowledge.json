@@ -1,0 +1,98 @@
+{
+  "board": "CBSE",
+  "class": "Class XII",
+  "chapter": "Solutions",
+  "source_type": "NCERT",
+
+  "pdf_metadata": {
+    "num_pages": 32,
+    "info": { "Title": "Chapter 1 — Solutions", "Author": "NCERT", "PDFFormatVersion": "1.7" },
+    "version": "1.7",
+    "raw_chars": 84210
+  },
+
+  "topics": [
+    "Types of Solutions",
+    "Expressing Concentration of Solutions",
+    "Solubility",
+    "Vapour Pressure of Liquid Solutions",
+    "Ideal and Non-ideal Solutions",
+    "Colligative Properties and Determination of Molar Mass",
+    "Abnormal Molar Masses"
+  ],
+  "subtopics": [
+    { "topic": "Expressing Concentration of Solutions", "name": "Mass percentage", "summary": "Ratio of mass of solute to mass of solution, expressed as a percentage." },
+    { "topic": "Expressing Concentration of Solutions", "name": "Molarity (M)", "summary": "Moles of solute per litre of solution; temperature-dependent." },
+    { "topic": "Expressing Concentration of Solutions", "name": "Molality (m)", "summary": "Moles of solute per kg of solvent; temperature-independent." },
+    { "topic": "Vapour Pressure of Liquid Solutions", "name": "Raoult's Law for ideal solutions", "summary": "Partial vapour pressure of each component equals its mole fraction times its pure vapour pressure." },
+    { "topic": "Colligative Properties and Determination of Molar Mass", "name": "Boiling point elevation", "summary": "ΔTb = Kb · m, where Kb is the molal elevation constant of the solvent." }
+  ],
+  "definitions": [
+    { "term": "Solution", "definition": "A homogeneous mixture of two or more substances in which the components are uniformly distributed.", "topic": "Types of Solutions" },
+    { "term": "Molality", "definition": "Number of moles of solute dissolved per kilogram of solvent.", "topic": "Expressing Concentration of Solutions" },
+    { "term": "Ideal solution", "definition": "A solution that obeys Raoult's law over the entire range of concentration and has zero enthalpy and volume of mixing.", "topic": "Ideal and Non-ideal Solutions" }
+  ],
+  "formulae": [
+    { "name": "Mass percentage", "expression": "% (w/w) = (mass of solute / mass of solution) × 100", "variables": "mass of solute, mass of solution", "topic": "Expressing Concentration of Solutions" },
+    { "name": "Molarity", "expression": "M = moles of solute / volume of solution in L", "variables": "n_solute, V_solution", "topic": "Expressing Concentration of Solutions" },
+    { "name": "Raoult's law (binary)", "expression": "P_total = x_A · P°_A + x_B · P°_B", "variables": "x_A, x_B mole fractions; P°_A, P°_B pure-component vapour pressures", "topic": "Vapour Pressure of Liquid Solutions" },
+    { "name": "Boiling point elevation", "expression": "ΔTb = Kb · m", "variables": "Kb molal elevation constant of solvent; m molality", "topic": "Colligative Properties and Determination of Molar Mass" }
+  ],
+  "laws": [
+    { "name": "Raoult's law", "statement": "For a solution of volatile liquids, the partial vapour pressure of each component is directly proportional to its mole fraction in the solution.", "topic": "Vapour Pressure of Liquid Solutions" },
+    { "name": "Henry's law", "statement": "At constant temperature, the solubility of a gas in a liquid is directly proportional to the partial pressure of the gas: p = K_H · x.", "topic": "Solubility" }
+  ],
+  "principles": [
+    { "name": "Like dissolves like", "statement": "Polar solutes dissolve in polar solvents; non-polar solutes dissolve in non-polar solvents.", "topic": "Solubility" }
+  ],
+  "reactions": [],
+  "examples": [
+    { "title": "Example 1.1", "summary": "Calculate mass percentage of NaOH in a solution prepared by dissolving 4 g NaOH in 36 g water.", "working": "% (w/w) = 4 / 40 × 100 = 10 %", "topic": "Expressing Concentration of Solutions" },
+    { "title": "Example 1.6", "summary": "Calculate vapour pressure of a solution of two volatile liquids using Raoult's law.", "working": "P = x_A · P°_A + x_B · P°_B", "topic": "Vapour Pressure of Liquid Solutions" }
+  ],
+  "tables": [
+    { "label": "Table 1.1", "summary": "Types of solutions with examples of solute and solvent in different physical states.", "rows": [
+      "Gaseous solutions: O2 + N2 (air)",
+      "Liquid solutions: NaCl in water; ethanol in water",
+      "Solid solutions: brass (Cu–Zn), amalgams (Hg with metals)"
+    ], "topic": "Types of Solutions" }
+  ],
+  "graph_references": [
+    { "label": "Fig 1.3", "describes": "Plot of vapour pressure vs mole fraction for an ideal binary solution showing linear behaviour for both components.", "topic": "Vapour Pressure of Liquid Solutions" }
+  ],
+  "diagram_references": [
+    { "label": "Fig 1.6", "describes": "Setup for measuring elevation in boiling point using a Cottrell apparatus.", "topic": "Colligative Properties and Determination of Molar Mass" }
+  ],
+  "important_facts": [
+    { "fact": "Molality is preferred over molarity in colligative-property calculations because it is independent of temperature.", "topic": "Colligative Properties and Determination of Molar Mass" },
+    { "fact": "Maximum-boiling azeotropes show negative deviation from Raoult's law (e.g. HNO3 + H2O).", "topic": "Ideal and Non-ideal Solutions" }
+  ],
+  "exceptions": [
+    { "rule": "Raoult's law applies to ideal solutions only", "exception": "Acetone + chloroform shows negative deviation due to hydrogen bonding between components.", "topic": "Ideal and Non-ideal Solutions" }
+  ],
+  "ncert_activities": [],
+
+  "clean_text": "<full cleaned chapter text — preserved verbatim for Phase 2 ground-truth grounding>",
+
+  "form_inputs": {
+    "board": "CBSE",
+    "class": "Class XII",
+    "chapter": "Solutions",
+    "source_type": "NCERT",
+    "question_type": "MCQ",
+    "difficulty": "MEDIUM",
+    "number_of_questions": 10,
+    "include_visual_questions": false,
+    "language": "English",
+    "generate_explanation": true
+  },
+
+  "meta": {
+    "phase": 1,
+    "schema_version": "1.0.0",
+    "chapter_code": "SOLUTIONS",
+    "batch_id": "lz9k2r-7f3a1c",
+    "generated_at": "2026-06-11T09:01:24Z",
+    "total_structured_entries": 18
+  }
+}

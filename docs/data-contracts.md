@@ -1,8 +1,6 @@
-# Data contracts
+# Phase 1 — Data contracts
 
 ## 1. Form submission
-
-### Visible fields
 
 | Field | Type | Required | Allowed values |
 |---|---|---|---|
@@ -11,24 +9,15 @@
 | Chapter Name | dropdown | yes | see `config/config.json#chapters` |
 | Source Type | dropdown | yes | `NCERT` / `Reference Book` / `Teacher Notes` / `PYQ Collection` / `Mixed` |
 | Reference PDF | file | yes | `.pdf` |
-| Question Type | dropdown | yes | `MCQ` / `VSA` / `SA` / `LA` / `AR` / `CASE_STUDY` |
-| Difficulty | dropdown | yes | `EASY` / `MEDIUM` / `HARD` |
-| Number of Questions | number | no | integer ≥ 1, default `10` |
-| Include Visual Questions | dropdown | no | `YES` / `NO`, default `NO` |
-| Language | dropdown | no | `English`, default `English` |
-| Generate Explanation | dropdown | no | `YES` / `NO`, default `YES` |
+| Question Type | dropdown | yes | `MCQ` / `VSA` / `SA` / `LA` / `AR` / `CASE_STUDY` *(stored for Phase 2)* |
+| Difficulty | dropdown | yes | `EASY` / `MEDIUM` / `HARD` *(stored for Phase 2)* |
+| Number of Questions | number | no | integer ≥ 1, default `10` *(stored for Phase 2)* |
+| Include Visual Questions | dropdown | no | `YES` / `NO`, default `NO` *(stored for Phase 2)* |
+| Language | dropdown | no | `English`, default `English` *(stored for Phase 2)* |
+| Generate Explanation | dropdown | no | `YES` / `NO`, default `YES` *(stored for Phase 2)* |
 
-### Hidden fields (set once)
-
-```
-PROMPT_MCQ_EASY  PROMPT_MCQ_MEDIUM  PROMPT_MCQ_HARD
-PROMPT_VSA_EASY  PROMPT_VSA_MEDIUM  PROMPT_VSA_HARD
-PROMPT_SA_EASY   PROMPT_SA_MEDIUM   PROMPT_SA_HARD
-PROMPT_LA_EASY   PROMPT_LA_MEDIUM   PROMPT_LA_HARD
-PROMPT_AR_EASY   PROMPT_AR_MEDIUM   PROMPT_AR_HARD
-PROMPT_CASE_STUDY_EASY  PROMPT_CASE_STUDY_MEDIUM  PROMPT_CASE_STUDY_HARD
-SYSTEM_GENERATOR  SYSTEM_STRUCTURER  SYSTEM_VALIDATOR
-```
+**Hidden field:**
+- `SYSTEM_STRUCTURER` — system prompt for the structurer LLM, set once on the form node.
 
 ## 2. Envelope after `Normalize Input`
 
@@ -45,105 +34,168 @@ SYSTEM_GENERATOR  SYSTEM_STRUCTURER  SYSTEM_VALIDATOR
   "include_visual_questions": false,
   "language": "English",
   "generate_explanation": true,
-  "prompt_key": "MCQ_MEDIUM",
   "chapter_code": "SOLUTIONS",
-  "difficulty_code": "M",
   "batch_id": "lz9k2r-7f3a1c",
   "started_at": "2026-06-11T09:00:00Z",
-  "selected_prompt": "TYPE=MCQ DIFFICULTY=MEDIUM | ...",
-  "system_generator": "You are an expert CBSE Chemistry...",
-  "system_structurer": "You are a chemistry chapter structurer...",
-  "system_validator": "You are a strict CBSE Chemistry validator...",
-  "attempt": 0
+  "knowledge_file_name": "SOLUTIONS_KNOWLEDGE.json",
+  "system_structurer": "You are a chemistry chapter structurer..."
 }
 ```
 
-`question_type_folder` differs from `question_type` only for AR (folder `AR`, JSON `A&R`).
+After `Clean PDF Text` additionally:
+```json
+{
+  "pdf_metadata": { "num_pages": 32, "info": {...}, "version": "1.7", "raw_chars": 84210 },
+  "cleaned_text": "<full cleaned chapter>"
+}
+```
 
-## 3. `chapter_knowledge` (output of Structurer)
+After `Parse Knowledge JSON`:
+```json
+{ "structured_knowledge": { /* per the structurer schema */ } }
+```
+
+After `Validate Knowledge Schema`:
+```json
+{ "validation": { "ok": true, "total_entries": 87 } }
+```
+
+After `Ensure Drive Folders`:
+```json
+{
+  "drive_folder_trail": [
+    { "name": "Question Bank", "id": "..." },
+    { "name": "CBSE",          "id": "..." },
+    { "name": "Class XII",     "id": "..." },
+    { "name": "Solutions",     "id": "..." },
+    { "name": "Knowledge Base","id": "..." }
+  ],
+  "target_folder_id": "<leaf folder id>"
+}
+```
+
+## 3. Structurer LLM input
+
+System prompt: contents of the hidden `SYSTEM_STRUCTURER` form field.
+
+User message:
+```
+Board: CBSE
+Class: Class XII
+Chapter: Solutions
+Source type: NCERT
+
+CLEANED CHAPTER TEXT (use ONLY this content):
+<cleaned_text>
+```
+
+## 4. Structurer LLM output (parsed into `structured_knowledge`)
 
 ```json
 {
-  "chapter": "Solutions",
+  "chapter_title": "Solutions",
+  "topics": ["Types of Solutions", "Concentration", "Raoult's Law", "Colligative Properties", "Abnormal Molar Masses"],
+  "subtopics": [{ "topic": "Concentration", "name": "Molarity", "summary": "..." }],
+  "definitions": [{ "term": "molality", "definition": "...", "topic": "Concentration" }],
+  "formulae": [{ "name": "Raoult", "expression": "P = x_A·P°_A + x_B·P°_B", "variables": "...", "topic": "Raoult's Law" }],
+  "laws": [{ "name": "Henry's Law", "statement": "...", "topic": "..." }],
+  "principles": [{ "name": "...", "statement": "...", "topic": "..." }],
+  "reactions": [{ "name": "...", "equation": "...", "conditions": "...", "topic": "..." }],
+  "examples": [{ "title": "...", "summary": "...", "working": "...", "topic": "..." }],
+  "tables": [{ "label": "Table 1.1", "summary": "...", "rows": ["..."], "topic": "..." }],
+  "graph_references": [{ "label": "Fig 1.6", "describes": "...", "topic": "..." }],
+  "diagram_references": [{ "label": "Fig 1.2", "describes": "...", "topic": "..." }],
+  "important_facts": [{ "fact": "...", "topic": "..." }],
+  "exceptions": [{ "rule": "...", "exception": "...", "topic": "..." }],
+  "ncert_activities": [{ "label": "Activity 1.1", "summary": "...", "topic": "..." }]
+}
+```
+
+Empty arrays are legal — but the keys must all exist.
+
+## 5. Final JSON uploaded to Drive
+
+Filename: `<CHAPTER_CODE>_KNOWLEDGE.json` (e.g. `SOLUTIONS_KNOWLEDGE.json`).
+
+```json
+{
+  "board": "CBSE",
   "class": "Class XII",
-  "summary": "...",
-  "sub_topics": [ { "name": "Raoult's Law", "key_ideas": ["...", "..."] } ],
-  "definitions": [ { "term": "molality", "definition": "..." } ],
-  "formulae": [ { "name": "Raoult", "expression": "P = x_A P°_A + x_B P°_B", "variables": "..." } ],
-  "reactions": [ { "name": "...", "equation": "...", "conditions": "..." } ],
-  "numerical_data": [ { "label": "Kb water", "value": "0.52", "units": "K kg mol⁻¹" } ],
-  "examples": [ { "title": "...", "summary": "..." } ],
-  "ncert_activities": [ "..." ],
-  "diagram_refs": [ { "label": "Fig 2.3", "describes": "..." } ],
-  "tables": [ { "label": "Table 1.1", "summary": "..." } ]
+  "chapter": "Solutions",
+  "source_type": "NCERT",
+
+  "pdf_metadata": {...},
+
+  "topics": [...],
+  "subtopics": [...],
+  "definitions": [...],
+  "formulae": [...],
+  "laws": [...],
+  "principles": [...],
+  "reactions": [...],
+  "examples": [...],
+  "tables": [...],
+  "graph_references": [...],
+  "diagram_references": [...],
+  "important_facts": [...],
+  "exceptions": [...],
+  "ncert_activities": [...],
+
+  "clean_text": "<full cleaned chapter>",
+
+  "form_inputs": {
+    "board": "CBSE",
+    "class": "Class XII",
+    "chapter": "Solutions",
+    "source_type": "NCERT",
+    "question_type": "MCQ",
+    "difficulty": "MEDIUM",
+    "number_of_questions": 10,
+    "include_visual_questions": false,
+    "language": "English",
+    "generate_explanation": true
+  },
+
+  "meta": {
+    "phase": 1,
+    "schema_version": "1.0.0",
+    "chapter_code": "SOLUTIONS",
+    "batch_id": "lz9k2r-7f3a1c",
+    "generated_at": "2026-06-11T09:01:24Z",
+    "total_structured_entries": 87
+  }
 }
 ```
 
-Empty arrays are legal.
+All required spec keys (`board`, `class`, `chapter`, `source_type`, `pdf_metadata`, `topics`, `subtopics`, `definitions`, `formulae`, `laws`, `principles`, `reactions`, `examples`, `tables`, `graph_references`, `diagram_references`, `important_facts`, `exceptions`, `clean_text`) are present at the top level. `form_inputs` and `meta` are additive and Phase-2-facing.
 
-## 4. Generator output
+## 6. Drive path & filename
+
+```
+Question Bank/CBSE/<Class>/<Chapter Name>/Knowledge Base/<CHAPTER_CODE>_KNOWLEDGE.json
+```
+
+- `<Chapter Name>` = exact dropdown value (spaces, apostrophes preserved).
+- `<CHAPTER_CODE>` = uppercase `[A-Z0-9_]` derived from `Chapter Name`, max 24 chars (e.g. `SOLUTIONS`, `STRUCTURE_OF_ATOM`, `THE_D_AND_F_BLOCK_ELEME`).
+- The folder tree is created lazily — missing levels are inserted on the first run, subsequent runs reuse them.
+
+## 7. Audit record from `Log Phase 1 Summary`
 
 ```json
 {
-  "questions": [
-    {
-      "question_id": "SOLUTIONS_MCQ_M_001",
-      "question": "...",
-      "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
-      "answer": "B",
-      "explanation": "...",
-      "difficulty": "MEDIUM",
-      "source_topic": "Raoult's Law",
-      "visual_required": false,
-      "visual_type": null,
-      "bloom_level": "Apply"
-    }
-  ]
+  "status": "OK",
+  "phase": 1,
+  "batch_id": "lz9k2r-7f3a1c",
+  "chapter": "Solutions",
+  "chapter_code": "SOLUTIONS",
+  "saved_file": "SOLUTIONS_KNOWLEDGE.json",
+  "drive_file_id": "1aBc...",
+  "drive_web_view_link": "https://drive.google.com/file/d/.../view",
+  "drive_folder_trail": [{"name":"Question Bank","id":"..."}, ...],
+  "pdf_pages": 32,
+  "total_structured_entries": 87,
+  "finished_at": "2026-06-11T09:01:25Z"
 }
 ```
 
-- `options` is `null` for VSA / SA / LA.
-- For `AR`, `options` is the 4 fixed labels and `answer ∈ {A,B,C,D}`.
-- For `CASE_STUDY`, each `questions[]` entry is `{ passage, sub_questions: [ { question, options|null, answer, explanation|null, visual_required, visual_type|null } ] }`.
-
-## 5. Validator output
-
-```json
-{
-  "results": [
-    {
-      "question_id": "SOLUTIONS_MCQ_M_001",
-      "valid": true,
-      "checks": {
-        "scientifically_correct": true,
-        "answer_matches_question": true,
-        "options_well_formed": true,
-        "ncert_aligned": true,
-        "difficulty_aligned": true,
-        "grammar_ok": true,
-        "spelling_ok": true,
-        "complete": true,
-        "explanation_correct": true
-      },
-      "issues": [],
-      "fix_hint": null
-    }
-  ]
-}
-```
-
-A question is kept ⇔ `valid === true`.
-
-## 6. Final payload (matches the spec)
-
-See `samples/sample-output.json`. Required spec keys: `board, class, chapter, source_type, question_type, difficulty, question_count, questions[]`. Additional keys are non-breaking.
-
-## 7. Drive path & filename
-
-```
-Question Bank/CBSE/<Class>/<Chapter>/<Type>/<Difficulty>/<chapter>_<type_folder>_<difficulty>_<batchId>.json
-```
-
-- `<Chapter>` is the exact dropdown value (spaces, apostrophes preserved).
-- `<Type>` is `MCQ` / `VSA` / `SA` / `LA` / `AR` / `CASE_STUDY` (note `AR`, not `A&R`).
-- `<batchId>` is base36 timestamp + 6 random chars, unique without coordination.
+This is the seam to pipe into Slack / BigQuery / a status board.

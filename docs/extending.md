@@ -1,97 +1,62 @@
-# Extending the platform
+# Extending Phase 1
 
-Each extension is a local change — the workflow graph stays the same.
+Phase 1 only does Knowledge Extraction. Every extension below is a small, local change.
 
 ## Add a new chapter
 
 1. `config/config.json#chapters.<class>` → append the chapter.
-2. Open `On form submission` → add the chapter to the `Chapter Name` dropdown.
+2. Open `On form submission` → add the chapter title to the `Chapter Name` dropdown.
 
-No prompt edits, no graph surgery.
+`chapter_code` and the Drive folder name are derived from the dropdown value automatically.
 
-## Add a new question type
-
-E.g. `NUMERICAL`.
-
-1. Open `On form submission`:
-   - Add `NUMERICAL` to the `Question Type` dropdown.
-   - Add three hidden fields: `PROMPT_NUMERICAL_EASY`, `PROMPT_NUMERICAL_MEDIUM`, `PROMPT_NUMERICAL_HARD` with their prompt text.
-2. `config/config.json#supported.question_types` → append `NUMERICAL`.
-3. Drive layout — automatic. `Ensure Drive Folders` walks the path from the envelope.
-
-`Normalize Input` already builds `PROMPT_${typeKey}_${diff}` so the new key is picked up with no code change.
-
-## Add a new board (ICSE)
+## Add a new board (e.g. ICSE)
 
 1. `config/config.json#supported.boards` → append `ICSE`.
 2. Open `On form submission` → add `ICSE` to the `Board` dropdown.
-3. If you need board-specific phrasing:
-   - Add 18 more hidden fields suffixed `_ICSE` (`PROMPT_MCQ_EASY_ICSE`, etc.).
-   - In `Normalize Input`, change the lookup to prefer the board-suffixed key when present:
-     ```js
-     const promptKey = `PROMPT_${typeKey}_${diff}`;
-     const boardKey = `${promptKey}_${f['Board']}`;
-     const selectedPrompt = f[boardKey] || f[promptKey];
-     ```
+
+If the structurer needs board-specific phrasing (rare for Phase 1 — extraction is largely board-agnostic), duplicate the `SYSTEM_STRUCTURER` hidden field as `SYSTEM_STRUCTURER_ICSE` and read the suffixed one in `Normalize Input` when `Board === 'ICSE'`.
 
 ## Add a new subject
 
-Subjects diverge more than boards. Clone the workflow and swap:
-- The chapter dropdown.
-- The 18 hidden prompts.
-- The 3 system prompts (especially `SYSTEM_GENERATOR` and `SYSTEM_VALIDATOR`).
+Subjects differ enough that the cleanest path is to clone the Phase 1 workflow and swap:
 
-The PDF → structure → generate → validate → dedupe → save pipeline is subject-agnostic.
+- `Chapter Name` dropdown values.
+- `SYSTEM_STRUCTURER` hidden field (subject-specific schema cues — e.g. for Biology you'd want `taxonomy[]` and `processes[]` arrays; for Physics you'd keep `formulae[]` and `laws[]` but lose `reactions[]`).
+- `Validate Knowledge Schema` Code node — update the `REQUIRED_ARRAYS` list to match the new schema.
 
-## Add Hindi
+The PDF → extract → clean → structure → save pipeline is subject-agnostic.
 
-1. `config/config.json#feature_flags.enable_hindi = true`.
-2. Open `On form submission` → add `Hindi` to the `Language` dropdown.
-3. Add 18 hidden fields suffixed `_HI` with Hindi instructions and Devanagari output expectations. Optionally add `SYSTEM_GENERATOR_HI`.
-4. In `Normalize Input`:
+## Add Hindi (or any new language)
+
+1. `Language` dropdown on the form → add `Hindi`.
+2. Add a hidden field `SYSTEM_STRUCTURER_HI` with Hindi structurer instructions emitting Devanagari output.
+3. In `Normalize Input`, pick the right system prompt:
    ```js
    const langSuffix = (f['Language'] || 'English') === 'Hindi' ? '_HI' : '';
-   const selectedPrompt = f[`PROMPT_${typeKey}_${diff}${langSuffix}`] || f[`PROMPT_${typeKey}_${diff}`];
-   const system_generator = f[`SYSTEM_GENERATOR${langSuffix}`] || f['SYSTEM_GENERATOR'];
+   const system_structurer = f[`SYSTEM_STRUCTURER${langSuffix}`] || f['SYSTEM_STRUCTURER'];
    ```
 
-## JEE / NEET / HOTS / Competency mode
+The output JSON shape stays the same — only the values are Devanagari.
 
-The lightest-touch option:
+## Use a different LLM provider
 
-1. Open `On form submission` → add `Exam Mode` dropdown (`BOARDS` default, plus `JEE`, `NEET`, `HOTS`, `COMPETENCY`).
-2. Add hidden fields with overlay rule blocks: `OVERLAY_JEE`, `OVERLAY_NEET`, `OVERLAY_HOTS`, `OVERLAY_COMPETENCY`.
-3. In `Build Prompt`, append the relevant overlay to `selected_prompt`:
-   ```js
-   const overlay = ctx[`overlay_${(ctx.exam_mode || 'BOARDS').toLowerCase()}`] || '';
-   const body = [ctx.selected_prompt + (overlay ? '\nOVERLAY:\n' + overlay : ''), ...].join('\n');
-   ```
+Replace `AI: Structure Chapter Knowledge` (`n8n-nodes-base.anthropic`) with the provider's chat node (OpenRouter, OpenAI, Gemini). The prompt is provider-neutral. You'll also need to adjust the response-path expression in `Parse Knowledge JSON` (currently reads `$json.content[0].text`).
 
-Heavier option: add a separate prompt set per exam mode, suffix `_JEE`, `_NEET`, etc.
+## OCR support for scanned PDFs
 
-## Topic-wise generation
+When `Clean PDF Text` throws "Cleaned text is suspiciously short", insert an OCR step between `Extract PDF Text & Metadata` and `Clean PDF Text`:
 
-The form already accepts one chapter PDF. To restrict to one sub-topic within the chapter:
+1. Add a `Tesseract` (community node) or call an OCR API (Google Vision, Mathpix for chemistry).
+2. Replace `$json.text` with the OCR-extracted text before `Clean PDF Text` runs.
 
-1. Add a `Sub-topic` text field on the form (optional).
-2. In `Build Prompt`, prepend `Restrict all questions to sub_topic: ${ctx.sub_topic}` when present.
+The rest of the pipeline is unchanged.
 
-## Multi-chapter generation
+## Pre-Phase 2 hand-off
 
-1. Make `Reference PDF` multi-file (`multipleFiles: true`).
-2. Add `Chapter Names` text/csv field instead of single dropdown.
-3. After `Normalize Input`, add a SplitOut node that emits one item per (PDF, chapter) pair.
-4. The rest of the pipeline runs per pair — each lands in its own folder via `Ensure Drive Folders`.
+When Phase 2 (prompt routing + question generation) is built, it will:
 
-## Swap LLM provider
+1. Read the form (same 11 fields again, OR a lighter form that only asks for question_type / difficulty / count).
+2. Resolve the matching `<CHAPTER_CODE>_KNOWLEDGE.json` from `Question Bank/CBSE/<Class>/<Chapter>/Knowledge Base/`.
+3. Use the structured arrays as ground truth for generation (no PDF re-extraction needed).
 
-Swap the three `n8n-nodes-base.anthropic` nodes for the provider's equivalent:
-- `Structure Chapter Knowledge` (cheap, T=0)
-- `AI: Generate Questions` (good, T=0.4)
-- `AI: Validate Questions` (cheap, T=0)
-
-Adjust the response-path expression in `Attach Knowledge Object`, `Parse Generation`, and `Filter Valid Questions` (currently `$json.content[0].text`).
-
-## Swap dedupe to embeddings
-
-Replace the body of `Deduplicate vs Bank` with a call to a vector store. Inputs (`validated_questions`, `existing_stems`) and outputs (`unique_questions`, `dropped_duplicates`) are unchanged — nothing else needs to know.
+Phase 2 should never re-parse the PDF — it operates entirely off the Phase 1 JSON.

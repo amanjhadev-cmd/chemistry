@@ -1,7 +1,9 @@
 {
   "platform": {
     "name": "Chemistry Question Generation Platform",
-    "version": "1.0.0",
+    "phase": 1,
+    "phase_name": "Knowledge Extraction",
+    "schema_version": "1.0.0",
     "owner": "team@nextleap.ai"
   },
   "defaults": {
@@ -17,7 +19,6 @@
     "source_types": ["NCERT", "Reference Book", "Teacher Notes", "PYQ Collection", "Mixed"],
     "question_types": ["MCQ", "VSA", "SA", "LA", "AR", "CASE_STUDY"],
     "difficulties": ["EASY", "MEDIUM", "HARD"],
-    "visual_types": ["DIAGRAM", "GRAPH", "TABLE", "DATA_INTERPRETATION"],
     "languages": ["English"]
   },
   "chapters": {
@@ -46,31 +47,21 @@
     ]
   },
   "ai": {
-    "generator_model": "claude-sonnet-4-6",
-    "validator_model": "claude-haiku-4-5-20251001",
     "structurer_model": "claude-haiku-4-5-20251001",
-    "max_tokens_generation": 8000,
-    "max_tokens_validation": 4000,
-    "temperature_generation": 0.4,
-    "temperature_validation": 0.0,
-    "max_regeneration_attempts": 3
+    "structurer_temperature": 0,
+    "structurer_max_tokens": 8000,
+    "structurer_max_tries": 2,
+    "structurer_wait_between_tries_ms": 3000
   },
   "drive": {
     "root_folder": "Question Bank",
-    "shared_with": [],
-    "filename_pattern": "{chapter}_{question_type}_{difficulty}_{timestamp}_{batch_id}.json"
+    "knowledge_subfolder": "Knowledge Base",
+    "filename_pattern": "{CHAPTER_CODE}_KNOWLEDGE.json"
   },
-  "duplicate_detection": {
-    "similarity_threshold": 0.85,
-    "lookback_files": 20,
-    "use_normalized_text": true
-  },
-  "feature_flags": {
-    "enable_hindi": false,
-    "enable_jee_mode": false,
-    "enable_neet_mode": false,
-    "enable_competency": false,
-    "enable_hots": false,
-    "enable_multi_chapter": false
+  "future_phases": {
+    "phase_2": "Prompt routing + AI question generation (consumes the Phase 1 JSON)",
+    "phase_3": "Validator pass (per-question 9-check verdict)",
+    "phase_4": "Duplicate detection + regeneration loop",
+    "phase_5": "Per-(type x difficulty) question-bank Drive storage"
   }
 }

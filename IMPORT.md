@@ -1,4 +1,4 @@
-# How to import into n8n
+# Phase 1 — How to import into n8n
 
 Single workflow, two credentials, one activate toggle.
 
@@ -10,29 +10,26 @@ In **Credentials → New**:
 
 | Credential | Type | Notes |
 |---|---|---|
-| `Anthropic` | Anthropic API | Paste your `sk-ant-...` key. The workflow uses Sonnet (generator) and Haiku (structurer + validator). |
-| `Google Drive OAuth2` | Google Drive OAuth2 API | Sign in with the Google account that owns the destination Drive. Scope `drive` (or `drive.file`) is sufficient. |
+| `Anthropic` | Anthropic API | Paste your `sk-ant-...` key. Phase 1 uses `claude-haiku-4-5-20251001` (Haiku) at temperature 0. |
+| `Google Drive OAuth2` | Google Drive OAuth2 API | Sign in with the Google account that owns the destination Drive. Scope `drive.file` is sufficient. |
 
-Note each credential's **ID** from the URL when you open the credential (e.g. `rkE6lGy0ggcpc3F4`).
+Note each credential's **ID** from the URL when you open it (e.g. `rkE6lGy0ggcpc3F4`).
 
 ---
 
 ## 2. Import the workflow
 
-**Workflows → ⋯ → Import from File** → pick `workflow/chemistry-question-generation.json`.
+**Workflows → ⋯ → Import from File** → pick `workflow/phase-1-knowledge-extraction.json`.
 
-Open each red-dotted node and bind:
+Open each red-dotted node and bind the credential:
 
 | Node | Credential |
 |---|---|
-| Structure Chapter Knowledge | Anthropic |
-| AI: Generate Questions | Anthropic |
-| AI: Validate Questions | Anthropic |
+| AI: Structure Chapter Knowledge | Anthropic |
 | Ensure Drive Folders | Google Drive OAuth2 |
-| Load Existing Bank Stems | Google Drive OAuth2 |
-| Upload to Google Drive | Google Drive OAuth2 |
+| Upload Knowledge JSON to Drive | Google Drive OAuth2 |
 
-### Or: find-and-replace in the JSON before import
+### Or: find-and-replace before import
 
 | Placeholder | Replace with |
 |---|---|
@@ -45,22 +42,23 @@ Open each red-dotted node and bind:
 
 1. Click the **Active** toggle (top right).
 2. `On form submission` shows the form URL under **Webhook URLs**. Open it.
-3. Submit a chapter PDF (try Class XII → Solutions → NCERT → MCQ → MEDIUM → 5 questions for a fast first run).
-4. Open **Executions** to watch each node fire.
-5. Check Drive — the file lands at `Question Bank/CBSE/Class XII/Solutions/MCQ/MEDIUM/Solutions_MCQ_MEDIUM_<batchId>.json`.
+3. Submit a chapter PDF (try **Class XII → Solutions → NCERT** for a known-good first run).
+4. Open **Executions** to watch each of the 12 nodes fire.
+5. Check Drive — the file lands at
+   `Question Bank/CBSE/Class XII/Solutions/Knowledge Base/SOLUTIONS_KNOWLEDGE.json`.
+
+The `Log Phase 1 Summary` node's output is your audit record.
 
 ---
 
-## 4. Editing prompts
+## 4. Editing the structurer prompt
 
-All 18 templates + the 3 system prompts live as `hiddenField` entries on the form node. To tweak:
+The structurer system prompt is stored as a hidden form field (`SYSTEM_STRUCTURER`).
 
 1. Open `On form submission`.
-2. Scroll to e.g. `PROMPT_MCQ_HARD`.
+2. Scroll to the `SYSTEM_STRUCTURER` hidden field.
 3. Edit `fieldValue` in place.
 4. Save the workflow. The change is live on the next submission.
-
-This is exactly the MockGenie pattern: prompts versioned with the workflow, single source of truth, no env vars or external files.
 
 ---
 
@@ -68,14 +66,20 @@ This is exactly the MockGenie pattern: prompts versioned with the workflow, sing
 
 | Symptom | Fix |
 |---|---|
-| `Could not find property 'Reference_PDF'` on Extract PDF | n8n sometimes converts the field label to `Reference_PDF` or `Reference PDF`. Open `Extract PDF Text` → set Binary Property to whichever appears in the form-trigger output. |
-| `Missing hidden prompt field: PROMPT_AR_HARD` | A hidden field got deleted by accident. Re-import the workflow JSON or re-add the missing `hiddenField`. |
-| Drive 403 on folder create | OAuth scope is too narrow. Re-auth with `drive.file` or `drive`. |
-| `Generator returned non-JSON` | Model wrapped the output in a markdown fence. `Parse Generation` strips ```` ```json ```` and ```` ``` ```` already; if it still trips, re-prompt with `Return ONLY JSON, no markdown.` appended to the user message. |
-| `IF` infinite loops | `Need Regeneration?` bounds attempts to 3. If you see >3 attempts, check that `Build Prompt` is incrementing `attempt`. |
+| `Could not find property 'Reference_PDF'` on Extract PDF | n8n sometimes labels the field `Reference PDF` (with space). Open `Extract PDF Text & Metadata` → set Binary Property to whichever appears in the form-trigger output. |
+| `Cleaned text is suspiciously short (<200 chars)` | The PDF is image-only / scanned. OCR it first (Tesseract / Acrobat) and re-upload. |
+| `Structurer returned non-JSON` | Re-run; usually a transient model hiccup at T=0. If it persists, open `AI: Structure Chapter Knowledge` and inspect the raw output — add `Return STRICT JSON only` reinforcement to the user-message prefix. |
+| `Knowledge object failed validation: …` | The structurer skipped required arrays. Inspect the LLM output in the failed execution; usually a stricter system prompt or a bigger `maxTokensToSample` fixes it. |
+| Drive 403 on folder creation | OAuth scope too narrow. Re-auth with `drive.file` (or `drive`). |
 
 ---
 
-## 6. Optional: swap LLM provider
+## 6. What's stored (and what isn't)
 
-Replace the three Anthropic nodes with OpenRouter / OpenAI / Gemini equivalents. Prompts are provider-neutral. You only need to map the response field in `Parse Generation` / `Filter Valid Questions` (currently reads `$json.content[0].text`).
+Phase 1 saves exactly one artefact per chapter:
+
+```
+Question Bank/CBSE/<Class>/<Chapter>/Knowledge Base/<CHAPTER_CODE>_KNOWLEDGE.json
+```
+
+The full JSON shape is documented in `docs/data-contracts.md`. Phase 2 (prompt routing + question generation) will read this file as input — you can rerun Phase 1 freely on the same chapter (Drive will keep revisions of the same filename).
