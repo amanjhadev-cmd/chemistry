@@ -1,87 +1,81 @@
-# How to import this into n8n
+# How to import into n8n
 
-The bundle is **two** workflow JSONs that talk to each other. Import the sub-workflow first so the main workflow can reference its id.
+Single workflow, two credentials, one activate toggle.
 
 ---
 
-## 1. Create credentials (do this once)
+## 1. Credentials (one-time)
 
-In **n8n → Credentials → New**:
+In **Credentials → New**:
 
 | Credential | Type | Notes |
 |---|---|---|
-| `Google Drive OAuth2` | Google Drive OAuth2 API | Sign in with the Google account that owns the destination folder. Scope `drive` (or `drive.file`) is fine. |
-| `OpenRouter` | OpenRouter API | Paste your OpenRouter API key. (The sub-workflow uses `qwen/qwen3-235b-a22b-2507` — change if you prefer Claude / GPT-4o.) |
-| `Gmail OAuth2` | Gmail OAuth2 | Used by the completion-email step. Skip if you don't want the email. |
+| `Anthropic` | Anthropic API | Paste your `sk-ant-...` key. The workflow uses Sonnet (generator) and Haiku (structurer + validator). |
+| `Google Drive OAuth2` | Google Drive OAuth2 API | Sign in with the Google account that owns the destination Drive. Scope `drive` (or `drive.file`) is sufficient. |
 
-Note the **credential IDs** (visible in the URL when you open each credential, e.g. `rkE6lGy0ggcpc3F4`). You'll paste them in step 4.
-
----
-
-## 2. Import the **sub**-workflow first
-
-1. **Workflows → ⋯ → Import from File** → pick `workflow/chemistry-question-generation-sub.json`.
-2. Open each node with a red dot and pick the credential you created:
-   - `Qwen3-Instruct` → OpenRouter
-   - `Upload to Drive` → Google Drive OAuth2
-3. **Save** the workflow (top right).
-4. Copy its **workflow ID** from the URL (e.g. `/workflow/cm6PZRSEL2Q3PndE` → `cm6PZRSEL2Q3PndE`).
+Note each credential's **ID** from the URL when you open the credential (e.g. `rkE6lGy0ggcpc3F4`).
 
 ---
 
-## 3. Import the **main** workflow
+## 2. Import the workflow
 
-1. **Workflows → ⋯ → Import from File** → pick `workflow/chemistry-question-generation.json`.
-2. Open the **`Call: QuestDrive Sub-Workflow`** node → in the Workflow dropdown, paste the sub-workflow id from step 2.4 (or pick it from the list).
-3. Open every red-dotted node and pick the matching credential:
-   - `Create Root Folder`, `Create Level Folder`, `Create Type Folder` → Google Drive OAuth2
-   - `Send Completion Email` → Gmail OAuth2 (or delete this node if not needed)
+**Workflows → ⋯ → Import from File** → pick `workflow/chemistry-question-generation.json`.
 
----
+Open each red-dotted node and bind:
 
-## 4. Replace credential placeholders (optional shortcut)
+| Node | Credential |
+|---|---|
+| Structure Chapter Knowledge | Anthropic |
+| AI: Generate Questions | Anthropic |
+| AI: Validate Questions | Anthropic |
+| Ensure Drive Folders | Google Drive OAuth2 |
+| Load Existing Bank Stems | Google Drive OAuth2 |
+| Upload to Google Drive | Google Drive OAuth2 |
 
-If you'd rather edit the JSON before import, the two files contain placeholder strings you can find-and-replace:
+### Or: find-and-replace in the JSON before import
 
 | Placeholder | Replace with |
 |---|---|
+| `REPLACE_ANTHROPIC_CRED_ID` | your Anthropic credential id |
 | `REPLACE_DRIVE_CRED_ID` | your Google Drive credential id |
-| `REPLACE_OPENROUTER_CRED_ID` | your OpenRouter credential id |
-| `REPLACE_GMAIL_CRED_ID` | your Gmail credential id |
-| `REPLACE_SUB_WORKFLOW_ID` | sub-workflow id from step 2.4 |
 
 ---
 
-## 5. Activate and test
+## 3. Activate and test
 
-1. **Activate** the main workflow (top right).
-2. Open the form URL — `On form submission` node shows it under **Webhook URLs** after activation.
-3. Fill the visible fields. The 18 hidden prompts are pre-filled, but if you ever want to tweak one, open the form node and edit `fieldValue` for that hidden field — no other change needed.
-4. Submit. Watch **Executions** to see folders being created and the sub-workflow firing.
-5. Check your Drive parent folder — the full tree should appear.
+1. Click the **Active** toggle (top right).
+2. `On form submission` shows the form URL under **Webhook URLs**. Open it.
+3. Submit a chapter PDF (try Class XII → Solutions → NCERT → MCQ → MEDIUM → 5 questions for a fast first run).
+4. Open **Executions** to watch each node fire.
+5. Check Drive — the file lands at `Question Bank/CBSE/Class XII/Solutions/MCQ/MEDIUM/Solutions_MCQ_MEDIUM_<batchId>.json`.
 
 ---
 
-## 6. Common first-run issues
+## 4. Editing prompts
+
+All 18 templates + the 3 system prompts live as `hiddenField` entries on the form node. To tweak:
+
+1. Open `On form submission`.
+2. Scroll to e.g. `PROMPT_MCQ_HARD`.
+3. Edit `fieldValue` in place.
+4. Save the workflow. The change is live on the next submission.
+
+This is exactly the MockGenie pattern: prompts versioned with the workflow, single source of truth, no env vars or external files.
+
+---
+
+## 5. Common first-run issues
 
 | Symptom | Fix |
 |---|---|
-| `Could not find workflow REPLACE_SUB_WORKFLOW_ID` | You forgot step 3.2. Re-open `Call: QuestDrive Sub-Workflow` and pick the sub-workflow. |
-| `Folder URL` invalid | n8n expects a full Drive folder URL like `https://drive.google.com/drive/folders/<id>`. Don't paste just the id. |
-| Sub-workflow errors with `questionPrompt is undefined` | The `Pack Prompt + Drive ID` node didn't pass through — re-check that the outer loop's Code node returns `prompt` not `Prompt` (case-sensitive). |
-| LLM output has Markdown code-fences | The parser already strips them. If a question still shows leading whitespace, it's harmless — fix it in `Parse LLM HTML` if you want it cleaner. |
-| 18-item outer loop stops at 3 | Open `Loop Over 18 Items (Outer)` → "Reset" → toggle on once if you re-run after a partial failure. |
-| Drive folder `A&R` creates as `A_R` | Expected — the workflow already maps `A&R → AR` for the folder name; the JSON keeps `A&R` in metadata. |
+| `Could not find property 'Reference_PDF'` on Extract PDF | n8n sometimes converts the field label to `Reference_PDF` or `Reference PDF`. Open `Extract PDF Text` → set Binary Property to whichever appears in the form-trigger output. |
+| `Missing hidden prompt field: PROMPT_AR_HARD` | A hidden field got deleted by accident. Re-import the workflow JSON or re-add the missing `hiddenField`. |
+| Drive 403 on folder create | OAuth scope is too narrow. Re-auth with `drive.file` or `drive`. |
+| `Generator returned non-JSON` | Model wrapped the output in a markdown fence. `Parse Generation` strips ```` ```json ```` and ```` ``` ```` already; if it still trips, re-prompt with `Return ONLY JSON, no markdown.` appended to the user message. |
+| `IF` infinite loops | `Need Regeneration?` bounds attempts to 3. If you see >3 attempts, check that `Build Prompt` is incrementing `attempt`. |
 
 ---
 
-## 7. Editing prompts
+## 6. Optional: swap LLM provider
 
-All 18 prompts live in the form-trigger node's `fieldValue` properties. To tweak (e.g. ask for 30 questions instead of 25):
-
-1. Open `On form submission`.
-2. Scroll to the hidden field (e.g. `EASY MCQ`).
-3. Edit `fieldValue` in place.
-4. Save the workflow. The change is live on the next submission — no other node needs to know.
-
-This is the whole reason the prompts are stored as hidden form fields rather than in env vars or files: **one place to edit, versioned with the workflow**.
+Replace the three Anthropic nodes with OpenRouter / OpenAI / Gemini equivalents. Prompts are provider-neutral. You only need to map the response field in `Parse Generation` / `Filter Valid Questions` (currently reads `$json.content[0].text`).

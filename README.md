@@ -1,129 +1,152 @@
-# Chemistry Question Generation Platform
+# Chemistry Question Generation Platform (CBSE)
 
-CBSE Chemistry mock-test generator built on top of the MockGenie / QuestDrive pattern:
+A production-grade **single n8n workflow** that turns a chapter PDF into a validated, deduplicated, structured-JSON CBSE Chemistry question bank, stored in Drive under `Question Bank/CBSE/<Class>/<Chapter>/<Type>/<Difficulty>/`.
 
-- **One form** with all 18 prompts pre-loaded as hidden fields (3 difficulties × 6 question types).
-- **One main workflow** creates the Drive folder tree and fans out per (level × type).
-- **One sub-workflow** runs the LLM, parses HTML output into structured JSON, and uploads each question as its own file.
+Built strictly to the platform spec (single workflow, 18 dynamic prompt templates, validator + dedupe + regen loop, structured JSON output). The MockGenie pattern contributed two ideas:
+
+1. **All 18 prompts (plus the 3 system prompts) live as hidden form fields** — versioned with the workflow, editable in one place, never out of sync with code.
+2. **Every node is wired end-to-end** — no orphan branches, no dangling error nodes.
 
 ```
-Form (visible fields + 18 hidden prompts)
-  └─ Create Root Folder (under "Folder URL")
-      └─ Generate 18 Question Prompts  ──▶  one item per level
-          └─ Create Level Folder (EASY / MEDIUM / HARD)
-              └─ Loop Over 18 Items (outer)
-                  └─ Expand Level → 6 Types
-                      └─ Create Type Folder (MCQ / VSA / SA / LA / AR / CASE_STUDY)
-                          └─ Pack Prompt + Drive ID
-                              └─ Call: QuestDrive Sub-Workflow ───┐
-                                                                  │
-                                            ┌─────────────────────┘
-                                            ▼
-                                    Sub-Workflow:
-                                    Loop Over Items
-                                      └─ Extract QuestionType
-                                          └─ AI Agent (Qwen3 via OpenRouter)
-                                              └─ Parse LLM HTML (one entry per Q)
-                                                  └─ Convert to JSON File
-                                                      └─ Upload to Drive
-                                                          └─ Loop back
-
-After all 18 items done:
-  Aggregate ─▶ Send Completion Email
+Form (visible + 18 hidden prompts + 3 hidden system prompts)
+  └─ Normalize Input            (resolves PROMPT_<TYPE>_<DIFF> from hidden fields)
+      └─ Extract PDF Text
+          └─ Clean PDF Text     (headers/footers/page-nums/OCR/dupes)
+              └─ Structure Chapter Knowledge   (Haiku → JSON knowledge object)
+                  └─ Attach Knowledge Object
+                      └─ Ensure Drive Folders  (Question Bank/CBSE/.../<Diff>)
+                          └─ Load Existing Bank Stems (up to 20 recent files)
+                              └─ Build Prompt        ◀─────────┐
+                                  └─ AI: Generate Questions    │
+                                      └─ Parse Generation      │
+                                          └─ AI: Validate      │
+                                              └─ Filter Valid  │
+                                                  └─ Deduplicate
+                                                      └─ Need Regen?
+                                                          ├─Yes─▶ Prepare Regen ─┘
+                                                          └─No──▶ Finalize JSON
+                                                                   └─ JSON → Binary
+                                                                       └─ Upload to Drive
+                                                                           └─ Log
 ```
 
 ## Files
 
 | Path | Purpose |
 |---|---|
-| `workflow/chemistry-question-generation.json` | Main workflow — form + folder tree + outer loop |
-| `workflow/chemistry-question-generation-sub.json` | Sub-workflow — LLM + parser + uploader |
-| `config/config.json` | Boards, classes, supported chapters, defaults, feature flags |
-| `docs/architecture.md` | Node-by-node walkthrough |
-| `docs/data-contracts.md` | Form fields, intermediate envelopes, final JSON per question |
-| `docs/extending.md` | How to add boards, subjects, languages, JEE / NEET / HOTS |
-| `samples/sample-output.json` | Representative final per-question JSON file |
+| `workflow/chemistry-question-generation.json` | The single importable n8n workflow (21 nodes) |
+| `config/config.json` | Supported enums + defaults + feature flags |
+| `docs/architecture.md` | Node-by-node walkthrough and design choices |
+| `docs/data-contracts.md` | Form, envelope, generator/validator, final JSON |
+| `docs/extending.md` | Add boards / subjects / Hindi / JEE / NEET / HOTS / multi-chapter |
+| `samples/sample-output.json` | A representative final payload |
+| `IMPORT.md` | Step-by-step n8n import |
 
-## Form fields
+## Form (single submission = one (type × difficulty))
 
-**Visible (asked from the user):**
+**Visible fields** (asked from user, per spec):
 
-| Field | Type | Notes |
-|---|---|---|
-| Board | dropdown | CBSE / ICSE / ISC / MH |
-| Class | dropdown | CLASS IX / X / XI / XII |
-| Subject | dropdown | Chemistry (locked) |
-| Chapter Name | text | |
-| Chapter No (e.g. 1,2,3) | number | |
-| Concept Name | text | |
-| Concept No | number | |
-| Reference Document | file | `.pdf` |
-| Folder URL | text | Google Drive parent folder URL |
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| Board | dropdown | yes | `CBSE` |
+| Class | dropdown | yes | `Class XI`, `Class XII` |
+| Chapter Name | dropdown | yes | 19 NCERT chapters seeded; extend in form node |
+| Source Type | dropdown | yes | `NCERT` / `Reference Book` / `Teacher Notes` / `PYQ Collection` / `Mixed` |
+| Reference PDF | file | yes | `.pdf` |
+| Question Type | dropdown | yes | `MCQ` / `VSA` / `SA` / `LA` / `AR` / `CASE_STUDY` |
+| Difficulty | dropdown | yes | `EASY` / `MEDIUM` / `HARD` |
+| Number of Questions | number | no | default `10` |
+| Include Visual Questions | dropdown | no | `YES` / `NO` (default `NO`) |
+| Language | dropdown | no | `English` (default) |
+| Generate Explanation | dropdown | no | `YES` / `NO` (default `YES`) |
 
-**Hidden (the 18 prompts — set once, never asked again):**
-
-```
-EASY MCQ          EASY VSA          EASY SA          EASY LA          EASY A&R          EASY CASE_STUDY
-MEDIUM MCQ        MEDIUM VSA        MEDIUM SA        MEDIUM LA        MEDIUM A&R        MEDIUM CASE_STUDY
-HARD MCQ          HARD VSA          HARD SA          HARD LA          HARD A&R          HARD CASE_STUDY
-```
-
-Each hidden field's `fieldValue` is the full prompt for that (level × type). They are read in the `Generate 18 Question Prompts` Code node, reshaped into `[{level, items:[{type, prompt}, ...]}]`, then fanned out.
-
-## Drive layout
-
-The main workflow appends:
+**Hidden fields** (set once, never asked again):
 
 ```
-<your-Folder-URL>/
-  CBSE-CLASS XII-Chemistry-Ch-1-Solutions-Co-2-Raoult's Law/
-    ├── EASY/
-    │   ├── MCQ/        Q1.json … Q25.json
-    │   ├── VSA/        Q1.json … Q25.json
-    │   ├── SA/
-    │   ├── LA/
-    │   ├── AR/
-    │   └── CASE_STUDY/
-    ├── MEDIUM/  …same six type folders
-    └── HARD/    …same six type folders
+PROMPT_MCQ_EASY    PROMPT_MCQ_MEDIUM    PROMPT_MCQ_HARD
+PROMPT_VSA_EASY    PROMPT_VSA_MEDIUM    PROMPT_VSA_HARD
+PROMPT_SA_EASY     PROMPT_SA_MEDIUM     PROMPT_SA_HARD
+PROMPT_LA_EASY     PROMPT_LA_MEDIUM     PROMPT_LA_HARD
+PROMPT_AR_EASY     PROMPT_AR_MEDIUM     PROMPT_AR_HARD
+PROMPT_CASE_STUDY_EASY  PROMPT_CASE_STUDY_MEDIUM  PROMPT_CASE_STUDY_HARD
+SYSTEM_GENERATOR   SYSTEM_STRUCTURER    SYSTEM_VALIDATOR
 ```
 
-Note: the type folder for `A&R` is named `AR` on disk (Drive doesn't love special chars in folder names — the Code node maps `A&R → AR` at folder creation, but `question_type: "A&R"` is preserved inside the JSON).
+`Normalize Input` reads `PROMPT_${question_type}_${difficulty}` from the form payload — that's the entire "prompt routing logic". One template add = one hidden field; no graph surgery.
 
-## Why a sub-workflow
-
-The reference pattern (and this build) splits the heavy lifting because:
-- The outer loop is **18 iterations**; each iteration produces **25 questions**. Keeping both loops in the same workflow makes execution graphs unreadable and aborts halfway lose the whole batch.
-- Splitting lets the sub-workflow be **retried independently** per (level × type) without re-creating folders or re-prompting Drive.
-- The sub-workflow is the natural seam for swapping LLM providers — change one node, not the whole tree.
-
-## Output JSON shape (per question)
+## Output JSON (matches the spec verbatim)
 
 ```json
 {
-  "Metadata": {
-    "board": "CBSE",
-    "class": "CLASS XII",
-    "subject": "Chemistry",
-    "chapter_no": 1,
-    "chapter_name": "Solutions",
-    "concept_no": 2,
-    "concept_name": "Raoult's Law",
-    "question_level": "MEDIUM",
-    "question_type": "MCQ"
-  },
-  "questionHtml": {
-    "question_no": "Q1",
-    "question_text": "<p>...</p>",
-    "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
-    "final_answer": {
-      "correct_option": "B,D",
-      "model_answer":   null
+  "board": "CBSE",
+  "class": "Class XII",
+  "chapter": "Solutions",
+  "source_type": "NCERT",
+  "question_type": "MCQ",
+  "difficulty": "MEDIUM",
+  "language": "English",
+  "include_visual_questions": false,
+  "generate_explanation": true,
+  "question_count": 10,
+  "generated_at": "2026-06-11T09:01:24Z",
+  "batch_id": "lz9k2r-7f3a1c",
+  "questions": [
+    {
+      "question_id": "SOLUTIONS_MCQ_M_001",
+      "question": "...",
+      "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+      "answer": "B",
+      "explanation": "...",
+      "difficulty": "MEDIUM",
+      "source_topic": "Raoult's Law",
+      "visual_required": false,
+      "visual_type": null,
+      "bloom_level": "Apply"
     }
-  }
+  ]
 }
 ```
 
-For VSA / SA / LA, `options` is `{}` and `final_answer.model_answer` carries the text answer. For CASE_STUDY, the parser keeps the full HTML cluster in `questionHtml.question_text` plus the original block in `final_answer.model_answer`.
+The required spec keys (`board`, `class`, `chapter`, `source_type`, `question_type`, `difficulty`, `question_count`, `questions[]`) are exactly as specified. Additional keys (`language`, `include_visual_questions`, `generate_explanation`, `generated_at`, `batch_id`, `visual_type`, `bloom_level`) are additive, never replace required ones.
 
-## See `IMPORT.md` for the step-by-step n8n import flow.
+## Drive layout (matches the spec)
+
+```
+Question Bank/
+  CBSE/
+    Class XI/  ·  Class XII/
+      <Chapter Name>/
+        MCQ/   EASY/  MEDIUM/  HARD/
+        VSA/   EASY/  MEDIUM/  HARD/
+        SA/    EASY/  MEDIUM/  HARD/
+        LA/    EASY/  MEDIUM/  HARD/
+        AR/    EASY/  MEDIUM/  HARD/
+        CASE_STUDY/  EASY/  MEDIUM/  HARD/
+            <chapter>_<type>_<difficulty>_<batchId>.json
+```
+
+Folders are created idempotently — re-running for the same path is a single `files.list` per level.
+
+## Why a single workflow
+
+The spec is explicit: **"Do NOT create separate workflows."** Routing is achieved by:
+
+- Hidden-field prompt store (18 prompts) read by `Normalize Input` via `PROMPT_${type}_${difficulty}`.
+- One linear pipeline that handles any (type × difficulty); difficulty bands and type families are described inside each prompt template, so the same generator/validator/dedupe path serves all 18 combinations.
+- Regeneration is a back-edge from `Need Regeneration?` (false branch flows forward; true branch flows back to `Build Prompt`) — bounded by `attempt < 3`.
+
+## Scalability
+
+| Future requirement | The change is |
+|---|---|
+| New chapter | Append to the `Chapter Name` dropdown |
+| New board (e.g. ICSE) | Append to `Board` dropdown; if board-specific phrasing is needed, add a board-suffix on the prompt key (`PROMPT_MCQ_EASY_ICSE`) and tweak `Normalize Input` to prefer it when present |
+| Hindi | Add `Hindi` to `Language` dropdown + 18 Hindi prompt variants + add `_HI` suffix logic in `Normalize Input` |
+| JEE / NEET / HOTS / Competency | Add `Exam Mode` dropdown; add a Code node before `AI: Generate Questions` that appends an overlay rule list to `selected_prompt` based on mode |
+| Multi-chapter | Make `Reference PDF` multi-file; split-out one item per PDF after `Normalize Input`; the rest of the pipeline runs per chapter; each lands in its own folder |
+
+See `docs/extending.md` for the exact diff each requires.
+
+## Import
+
+See `IMPORT.md`.
