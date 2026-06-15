@@ -1,0 +1,38 @@
+name: Pre-deploy checks
+
+on:
+  pull_request:
+    paths:
+      - 'prompt-repo/**'
+      - 'samples/smoke_test/test_units.mjs'
+      - '.github/workflows/pre-deploy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'prompt-repo/**'
+      - 'samples/smoke_test/test_units.mjs'
+      - '.github/workflows/pre-deploy.yml'
+  workflow_dispatch: {}
+
+jobs:
+  prompt-repo-lint:
+    name: Prompt repo lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Lint prompt repo
+        run: node prompt-repo/lint.mjs
+
+  unit-tests:
+    name: Deterministic agent unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run unit tests
+        run: node samples/smoke_test/test_units.mjs
