@@ -173,6 +173,94 @@ t('curriculum key chain has 6 levels in precedence order', () => {
   assert.equal(keys[5], 'global');
 });
 
+// ---------- Curriculum: precedence resolution against seeded rows ----------
+// Mirrors what Postgres does with ORDER BY level ASC LIMIT 1 against the rows
+// seeded by db/migrations/0008_seed_cbse_chemistry_curriculum.sql.
+
+const seededCurriculum = {
+  cbse_12_chemistry_solutions_mcq_intermediate: { level: 1 },
+  cbse_12_chemistry_mcq: { level: 2 },
+  cbse_12_chemistry: { level: 3 },
+  cbse_chemistry: { level: 4 },
+  cbse: { level: 5 },
+  icse_12_chemistry: { level: 3 },
+  global: { level: 6 },
+};
+
+const resolveCurriculum = (rows, m) => {
+  const candidates = buildCurriculumKeys(m);
+  let best = null;
+  for (const k of candidates) {
+    if (rows[k] && (best === null || rows[k].level < best.level)) {
+      best = { key: k, level: rows[k].level };
+    }
+  }
+  return best;
+};
+
+t('curriculum resolve: CBSE/12/Chem/Solutions/MCQ/Intermediate hits level 1', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'cbse', class: '12', subject: 'chemistry', chapter_slug: 'solutions',
+    question_type: 'mcq', difficulty: 'intermediate',
+  });
+  assert.equal(r.key, 'cbse_12_chemistry_solutions_mcq_intermediate');
+  assert.equal(r.level, 1);
+});
+
+t('curriculum resolve: CBSE/12/Chem/Electrochem/MCQ/Hard falls to level 2 (cbse_12_chemistry_mcq)', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'cbse', class: '12', subject: 'chemistry', chapter_slug: 'electrochemistry',
+    question_type: 'mcq', difficulty: 'hard',
+  });
+  assert.equal(r.key, 'cbse_12_chemistry_mcq');
+  assert.equal(r.level, 2);
+});
+
+t('curriculum resolve: CBSE/12/Chem/Solutions/LA/Intermediate falls to level 3 (cbse_12_chemistry)', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'cbse', class: '12', subject: 'chemistry', chapter_slug: 'solutions',
+    question_type: 'la', difficulty: 'intermediate',
+  });
+  assert.equal(r.key, 'cbse_12_chemistry');
+  assert.equal(r.level, 3);
+});
+
+t('curriculum resolve: CBSE/11/Chem/* falls to level 4 (cbse_chemistry)', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'cbse', class: '11', subject: 'chemistry', chapter_slug: 'thermodynamics',
+    question_type: 'mcq', difficulty: 'easy',
+  });
+  assert.equal(r.key, 'cbse_chemistry');
+  assert.equal(r.level, 4);
+});
+
+t('curriculum resolve: CBSE/9/Bio falls to level 5 (cbse)', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'cbse', class: '9', subject: 'biology', chapter_slug: 'cell',
+    question_type: 'mcq', difficulty: 'easy',
+  });
+  assert.equal(r.key, 'cbse');
+  assert.equal(r.level, 5);
+});
+
+t('curriculum resolve: ICSE/12/Chem hits the ICSE level-3 demo seed', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'icse', class: '12', subject: 'chemistry', chapter_slug: 'metallurgy',
+    question_type: 'mcq', difficulty: 'hard',
+  });
+  assert.equal(r.key, 'icse_12_chemistry');
+  assert.equal(r.level, 3);
+});
+
+t('curriculum resolve: unrelated board (jee/11/physics) falls all the way to global', () => {
+  const r = resolveCurriculum(seededCurriculum, {
+    board: 'jee', class: '11', subject: 'physics', chapter_slug: 'kinematics',
+    question_type: 'mcq', difficulty: 'hard',
+  });
+  assert.equal(r.key, 'global');
+  assert.equal(r.level, 6);
+});
+
 // ---------- Prompt repo: 8-level fallback ----------
 
 const buildPromptFallbackKeys = (m) => [
