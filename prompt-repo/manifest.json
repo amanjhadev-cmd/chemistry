@@ -63,6 +63,13 @@
     }
   },
   "validators": {
+    "cbse_mcq": {
+      "id": "cbse_mcq",
+      "version": "v1",
+      "active": true,
+      "path": "validators/cbse_mcq.v1.j2",
+      "output_schema": "schemas/output/validator.v1.json"
+    },
     "global_mcq": {
       "id": "global_mcq",
       "version": "v1",

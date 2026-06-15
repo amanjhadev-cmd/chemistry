@@ -289,6 +289,13 @@ const v1Manifest = {
   global_default: { id: 'global_default', version: 'v1', active: true },
 };
 
+// Validator manifest after (i) — cbse_mcq validator now active alongside global fallbacks.
+const v1ValidatorManifest = {
+  cbse_mcq: { id: 'cbse_mcq', version: 'v1', active: true },
+  global_mcq: { id: 'global_mcq', version: 'v1', active: true },
+  global_default: { id: 'global_default', version: 'v1', active: true },
+};
+
 t('prompt resolve: level 1 hit for exact specificity', () => {
   const r = resolvePrompt(v1Manifest, {
     board: 'cbse', class: '12', subject: 'chemistry',
@@ -326,6 +333,30 @@ t('prompt resolve: returns null only if even global_default is missing or inacti
     board: 'x', class: '1', subject: 'y', question_type: 'z', difficulty: 'easy',
   });
   assert.equal(r, null);
+});
+
+t('validator resolve: CBSE MCQ run hits cbse_mcq (level 5), not global_default', () => {
+  const r = resolvePrompt(v1ValidatorManifest, {
+    board: 'cbse', class: '12', subject: 'chemistry',
+    question_type: 'mcq', difficulty: 'intermediate',
+  });
+  assert.equal(r.key, 'cbse_mcq');
+});
+
+t('validator resolve: non-CBSE MCQ falls through to global_mcq', () => {
+  const r = resolvePrompt(v1ValidatorManifest, {
+    board: 'icse', class: '12', subject: 'chemistry',
+    question_type: 'mcq', difficulty: 'hard',
+  });
+  assert.equal(r.key, 'global_mcq');
+});
+
+t('validator resolve: non-MCQ question type falls to global_default', () => {
+  const r = resolvePrompt(v1ValidatorManifest, {
+    board: 'cbse', class: '12', subject: 'chemistry',
+    question_type: 'la', difficulty: 'intermediate',
+  });
+  assert.equal(r.key, 'global_default');
 });
 
 // ---------- AI call ledger invariant ----------
