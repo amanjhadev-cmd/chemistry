@@ -1,0 +1,92 @@
+{
+  "manifest_version": "v1",
+  "updated_at": "2026-06-15",
+  "active_prompt_repo_version": "v1",
+  "fallback_order": [
+    "{board}_{class}_{subject}_{question_type}_{difficulty}",
+    "{board}_{class}_{subject}_{question_type}",
+    "{board}_{class}_{subject}",
+    "{board}_{subject}_{question_type}",
+    "{board}_{question_type}",
+    "global_{question_type}_{difficulty}",
+    "global_{question_type}",
+    "global_default"
+  ],
+  "generators": {
+    "cbse_12_chemistry_mcq_intermediate": {
+      "id": "cbse_12_chemistry_mcq_intermediate",
+      "version": "v1",
+      "active": true,
+      "path": "generators/cbse_12_chemistry_mcq_intermediate.v1.j2",
+      "output_schema": "schemas/output/mcq.v2.json",
+      "rubrics": {
+        "difficulty": "rubrics/difficulty/intermediate.v1.md",
+        "question_type": "rubrics/question_type/mcq.v1.md",
+        "visual": "rubrics/visual/general.v1.md"
+      }
+    },
+    "cbse_mcq": {
+      "id": "cbse_mcq",
+      "version": "v1",
+      "active": true,
+      "path": "generators/cbse_mcq.v1.j2",
+      "output_schema": "schemas/output/mcq.v2.json",
+      "rubrics": {
+        "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
+        "question_type": "rubrics/question_type/mcq.v1.md",
+        "visual": "rubrics/visual/general.v1.md"
+      }
+    },
+    "global_mcq": {
+      "id": "global_mcq",
+      "version": "v1",
+      "active": true,
+      "path": "generators/global_mcq.v1.j2",
+      "output_schema": "schemas/output/mcq.v2.json",
+      "rubrics": {
+        "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
+        "question_type": "rubrics/question_type/mcq.v1.md",
+        "visual": "rubrics/visual/general.v1.md"
+      }
+    },
+    "global_default": {
+      "id": "global_default",
+      "version": "v1",
+      "active": true,
+      "path": "generators/global_default.v1.j2",
+      "output_schema": "schemas/output/mcq.v2.json",
+      "rubrics": {
+        "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
+        "question_type": "rubrics/question_type/{question_type}.v1.md",
+        "visual": "rubrics/visual/general.v1.md"
+      }
+    }
+  },
+  "validators": {
+    "global_mcq": {
+      "id": "global_mcq",
+      "version": "v1",
+      "active": true,
+      "path": "validators/global_mcq.v1.j2",
+      "output_schema": "schemas/output/validator.v1.json"
+    },
+    "global_default": {
+      "id": "global_default",
+      "version": "v1",
+      "active": true,
+      "path": "validators/global_default.v1.j2",
+      "output_schema": "schemas/output/validator.v1.json"
+    }
+  },
+  "output_schemas": {
+    "mcq": { "version": "v2", "path": "schemas/output/mcq.v2.json" },
+    "la":  { "version": "v1", "path": "schemas/output/la.v1.json" },
+    "validator": { "version": "v1", "path": "schemas/output/validator.v1.json" }
+  },
+  "contracts": {
+    "metadata": "schemas/contracts/metadata.schema.json",
+    "curriculum_constraints": "schemas/contracts/curriculum_constraints.schema.json",
+    "chapter_knowledge": "schemas/contracts/chapter_knowledge.schema.json",
+    "duplicate_candidates": "schemas/contracts/duplicate_candidates.schema.json"
+  }
+}

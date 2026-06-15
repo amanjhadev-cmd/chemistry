@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/contracts/chapter_knowledge.schema.json",
+  "title": "chapter_knowledge contract (output of Agent 3)",
+  "type": "object",
+  "required": ["pdf_hash", "extractor_version", "extraction_quality"],
+  "properties": {
+    "pdf_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "extractor_version": { "type": "string" },
+    "pages": { "type": "integer", "minimum": 0 },
+    "extraction_quality": { "type": "number", "minimum": 0, "maximum": 1 },
+    "scanned": { "type": "boolean" },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "heading": { "type": "string" },
+          "page_range": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 2 },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "term": { "type": "string" },
+          "text": { "type": "string" },
+          "page": { "type": "integer" },
+          "section_id": { "type": "string" }
+        }
+      }
+    },
+    "examples": { "type": "array" },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "page": { "type": "integer" },
+          "rows": { "type": "array" },
+          "caption": { "type": "string" }
+        }
+      }
+    },
+    "formulas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "latex": { "type": "string" },
+          "page": { "type": "integer" }
+        }
+      }
+    },
+    "visuals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["visual_id"],
+        "properties": {
+          "visual_id": { "type": "string" },
+          "visual_type": { "type": "string" },
+          "page": { "type": "integer" },
+          "bbox": { "type": "array" },
+          "asset_path": { "type": "string" },
+          "caption": { "type": "string" },
+          "nearby_text": { "type": "string" }
+        }
+      }
+    },
+    "summary": { "type": "string", "maxLength": 8000 }
+  }
+}

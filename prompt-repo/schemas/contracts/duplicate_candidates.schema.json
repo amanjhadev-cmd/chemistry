@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/contracts/duplicate_candidates.schema.json",
+  "title": "duplicate_candidates contract (output of Agent 6)",
+  "type": "object",
+  "required": ["draft_question_id", "candidates"],
+  "properties": {
+    "draft_question_id": { "type": "string" },
+    "normalized_hash": { "type": "string" },
+    "simhash": { "type": "integer" },
+    "exact_duplicate_id": { "type": ["string", "null"] },
+    "candidates": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["question_id", "similarity_score", "method"],
+        "properties": {
+          "question_id": { "type": "string" },
+          "similarity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "method": { "type": "string", "enum": ["exact_hash", "trigram", "fts", "simhash", "minhash"] },
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "question_type": { "type": "string" },
+          "difficulty": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    }
+  }
+}

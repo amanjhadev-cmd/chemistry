@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/contracts/metadata.schema.json",
+  "title": "metadata contract (output of Agent 1)",
+  "type": "object",
+  "required": [
+    "batch_id", "source_pdf_id", "submitted_at", "board", "class",
+    "subject", "chapter_name", "chapter_slug", "source_type",
+    "question_type", "difficulty", "number_of_questions",
+    "overgeneration_factor", "draft_count", "language",
+    "include_visual_questions", "routing_key",
+    "extractor_version", "curriculum_rules_version", "prompt_repo_version",
+    "n8n_execution_id"
+  ],
+  "properties": {
+    "batch_id": { "type": "string", "pattern": "^BCH_[A-Z0-9_]+$" },
+    "source_pdf_id": { "type": "string" },
+    "source_pdf_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "board": { "type": "string" },
+    "class": { "type": "string" },
+    "subject": { "type": "string" },
+    "chapter_name": { "type": "string" },
+    "chapter_slug": { "type": "string" },
+    "source_type": { "type": "string" },
+    "question_type": { "type": "string" },
+    "difficulty": { "type": "string" },
+    "number_of_questions": { "type": "integer", "minimum": 1, "maximum": 200 },
+    "overgeneration_factor": { "type": "number", "minimum": 1.0, "maximum": 3.0 },
+    "draft_count": { "type": "integer", "minimum": 1 },
+    "language": { "type": "string" },
+    "include_visual_questions": { "type": "boolean" },
+    "routing_key": { "type": "string" },
+    "extractor_version": { "type": "string" },
+    "curriculum_rules_version": { "type": "string" },
+    "prompt_repo_version": { "type": "string" },
+    "n8n_execution_id": { "type": "string" }
+  }
+}

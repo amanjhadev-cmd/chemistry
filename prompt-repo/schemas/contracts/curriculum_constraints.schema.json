@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/contracts/curriculum_constraints.schema.json",
+  "title": "curriculum_constraints contract (output of Agent 2)",
+  "type": "object",
+  "required": [
+    "resolution", "marks", "answer_length", "bloom_levels_allowed",
+    "cognitive_level", "style", "forbidden_patterns"
+  ],
+  "properties": {
+    "resolution": {
+      "type": "object",
+      "required": ["level", "key"],
+      "properties": {
+        "level": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "key": { "type": "string" }
+      }
+    },
+    "marks": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      }
+    },
+    "answer_length": {
+      "type": "object",
+      "required": ["min_words", "max_words"],
+      "properties": {
+        "min_words": { "type": "integer", "minimum": 0 },
+        "max_words": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "bloom_levels_allowed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["remember", "understand", "apply", "analyze", "evaluate", "create"]
+      },
+      "minItems": 1
+    },
+    "cognitive_level": { "type": "string" },
+    "style": { "type": "string" },
+    "forbidden_patterns": { "type": "array", "items": { "type": "string" } },
+    "terminology": {
+      "type": "object",
+      "properties": {
+        "prefer": { "type": "array", "items": { "type": "string" } },
+        "avoid": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "competency_tags": { "type": "array", "items": { "type": "string" } },
+    "options_count_for_mcq": { "type": "integer", "minimum": 2, "maximum": 6 }
+  }
+}

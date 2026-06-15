@@ -1,0 +1,38 @@
+{# Validator - global MCQ. Adds MCQ-specific checks on top of global_default. #}
+You are a strict {{ metadata.board | upper }} Class {{ metadata.class }} {{ metadata.subject }} MCQ validator and duplicate judge.
+
+TASK
+For EACH MCQ draft, score all dimensions, judge duplicates, and assign validation_status.
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS
+{{ curriculum_constraints | tojson }}
+
+CHAPTER KNOWLEDGE
+{{ chapter_knowledge_summary }}
+
+INPUT
+{{ drafts_with_candidates | tojson }}
+
+OUTPUT SCHEMA
+{{ validator_output_schema }}
+
+MCQ-SPECIFIC VALIDATION (in addition to general scoring)
+- answer must be exactly one of the option keys present in options.
+- Reject (tag `bad`) if multiple options are arguably correct -> ambiguity_score = 1.0.
+- Reject if any option is "all of the above" / "none of the above" / "both A and C" style -> bad.
+- Reject if distractors are obviously wrong without engaging the concept -> bad.
+- Penalize (upgrade) if options vary wildly in length or grammatical structure.
+- Penalize if the stem leaks the answer (e.g. plural cue in stem when only one option is plural).
+
+TAGGING RULES
+- good: factual >= 0.85, answer >= 0.9, alignment >= 0.8, grammar >= 0.85, ambiguity <= 0.2, no hallucination, unique, MCQ structure clean.
+- bad: hallucination OR duplicate OR answer not in options OR answer wrong OR multiple correct OR forbidden option phrase.
+- upgrade: salvageable issues only.
+
+STRICT RULES
+- One results[] entry per draft.
+- duplicate_candidate_ids[] subset of provided candidates only.
+- JSON ONLY.

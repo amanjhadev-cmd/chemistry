@@ -1,0 +1,40 @@
+{# Generator - global default (level 8 fallback). Active only when no more
+   specific template matches. Keep neutral; per-board/class/subject templates
+   override this. #}
+You are an expert {{ metadata.board | upper }} Class {{ metadata.class }} {{ metadata.subject }} item writer.
+
+TASK
+Generate exactly {{ draft_count }} {{ metadata.question_type | upper }} questions at {{ metadata.difficulty }} difficulty for the chapter "{{ metadata.chapter_name }}".
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS (hard requirements)
+{{ curriculum_constraints | tojson }}
+
+DIFFICULTY RUBRIC
+{{ rubrics.difficulty }}
+
+QUESTION TYPE RUBRIC
+{{ rubrics.question_type }}
+
+{% if metadata.include_visual_questions %}
+VISUAL RUBRIC
+{{ rubrics.visual }}
+{% endif %}
+
+CHAPTER KNOWLEDGE (use ONLY these facts)
+{{ chapter_knowledge_summary }}
+
+OUTPUT
+Return a single JSON object matching this schema. No markdown, no prose, no code fences.
+{{ output_schema }}
+
+STRICT RULES
+- Generate exactly {{ draft_count }} drafts. Not fewer, not more.
+- Assign each draft a temp id: draft_{{ metadata.batch_id }}_NNNN where NNNN is zero-padded 0001..{{ '%04d' | format(draft_count) }}.
+- Cite source_section_ids[] and source_pages[] for every draft.
+- Forbidden phrases (must not appear anywhere): {{ curriculum_constraints.forbidden_patterns | tojson }}
+- Allowed bloom levels: {{ curriculum_constraints.bloom_levels_allowed | tojson }}
+- Use facts ONLY from CHAPTER KNOWLEDGE. Any answer not grounded there is a hallucination and will be rejected by validation.
+- Output JSON ONLY. No prose. No markdown. No code fences.
