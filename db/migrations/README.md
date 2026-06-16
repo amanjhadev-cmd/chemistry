@@ -12,7 +12,8 @@ for f in 0001_extensions.sql \
          0007_audit_and_coverage.sql \
          0008_seed_cbse_chemistry_curriculum.sql \
          0009_drive_folder_cache.sql \
-         0010_extend_buckets_with_dedup_sigs.sql; do
+         0010_extend_buckets_with_dedup_sigs.sql \
+         0011_coverage_tracker_triggers.sql; do
   psql "$DATABASE_URL" -f "db/migrations/$f"
 done
 ```
@@ -31,6 +32,7 @@ done
 | `0008_seed_cbse_chemistry_curriculum.sql` | 6 curriculum override rows: levels 5→1 for CBSE/Class 12/Chemistry/Solutions/MCQ/Intermediate, plus level-3 `icse_12_chemistry` for a second-board demo. After applying, `Curriculum - DB Lookup` resolves CBSE Class 12 Chemistry submissions at the most specific matching level instead of falling through to `global`. | `Curriculum - DB Lookup`, `Curriculum - Resolve` |
 | `0009_drive_folder_cache.sql` | `drive_folder_cache` — path→folder_id cache for the Drive Folder Resolver. Seeded for the v2 optimization (resolver currently walks the Drive API live; cache lets it short-circuit known path prefixes). | `Drive Folder Resolver` (v2) |
 | `0010_extend_buckets_with_dedup_sigs.sql` | Adds `normalized_question_hash`, `simhash`, `minhash_signature` columns + indexes to `review_queue` and `rejected_questions`, mirroring what was already on `questions_master`. Enables cross-bucket duplicate analytics. | `PG - Insert UPGRADE`, `PG - Insert BAD` |
+| `0011_coverage_tracker_triggers.sql` | `AFTER INSERT` row triggers on all three bucket tables that UPSERT into `coverage_tracker` (good_count / upgrade_count / bad_count per (board,class,subject,chapter,topic,subtopic,qtype,difficulty)). Adds `coverage_tracker_rebuild()` procedure and `coverage_gaps` view (rows with `good_count < 5`). Trigger on the partitioned `questions_master` parent propagates to all LIST partitions automatically (PG 13+). | DB-side only — no workflow node |
 
 ## Hard invariants enforced at the DB level
 

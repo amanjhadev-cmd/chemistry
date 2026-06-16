@@ -53,6 +53,24 @@ psql "$DATABASE_URL" -At -c \
   "SELECT count(*) FROM rejected_questions WHERE batch_id = '${BATCH}' AND validation_status <> 'bad';"
 
 echo
+echo "Coverage tracker rollup for this batch's (board,class,subject,chapter,qtype,difficulty):"
+psql "$DATABASE_URL" -c \
+  "SELECT board, class, subject, chapter, question_type, difficulty,
+          good_count, upgrade_count, bad_count, last_updated
+   FROM coverage_tracker
+   WHERE (board, class, subject, question_type, difficulty) IN (
+     SELECT DISTINCT board, class, subject, question_type, difficulty
+     FROM questions_master WHERE batch_id = '${BATCH}'
+     UNION
+     SELECT DISTINCT board, class, subject, question_type, difficulty
+     FROM review_queue WHERE batch_id = '${BATCH}'
+     UNION
+     SELECT DISTINCT board, class, subject, question_type, difficulty
+     FROM rejected_questions WHERE batch_id = '${BATCH}'
+   )
+   ORDER BY last_updated DESC LIMIT 10;"
+
+echo
 echo "Curriculum + prompt provenance from the audit body:"
 psql "$DATABASE_URL" -c \
   "SELECT audit->>'prompt_template_id' AS prompt_id,
