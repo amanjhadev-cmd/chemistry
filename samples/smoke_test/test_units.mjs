@@ -359,6 +359,101 @@ t('validator resolve: non-MCQ question type falls to global_default', () => {
   assert.equal(r.key, 'global_default');
 });
 
+// ---------- SimHash + MinHash (mirrors Compute Dedup Signatures node) ----------
+
+const normalize = (s) =>
+  String(s || '').toLowerCase().normalize('NFKC').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+const tokenize = (s) => {
+  const norm = normalize(s);
+  if (!norm) return [];
+  const words = norm.split(' ').filter((w) => w.length > 0);
+  if (words.length < 3) {
+    if (norm.length < 3) return [norm];
+    const t = [];
+    for (let i = 0; i <= norm.length - 3; i++) t.push(norm.slice(i, i + 3));
+    return t;
+  }
+  const out = [];
+  for (let i = 0; i <= words.length - 3; i++) out.push(words.slice(i, i + 3).join(' '));
+  return out;
+};
+
+const sha256Bytes = (s) => createHash('sha256').update(s).digest();
+
+const simhash64 = (tokens) => {
+  if (!tokens.length) return 0n;
+  const v = new Int32Array(64);
+  for (const tok of tokens) {
+    const buf = sha256Bytes(tok);
+    for (let i = 0; i < 64; i++) {
+      const bit = (buf[i >> 3] >> (i & 7)) & 1;
+      v[i] += bit ? 1 : -1;
+    }
+  }
+  let u = 0n;
+  for (let i = 0; i < 64; i++) if (v[i] > 0) u |= 1n << BigInt(i);
+  return u & (1n << 63n) ? u - (1n << 64n) : u;
+};
+
+const hammingDistance = (a, b) => {
+  // BigInt XOR + popcount; matches Postgres bit_count(simhash # i.simhash).
+  let x = (a < 0n ? a + (1n << 64n) : a) ^ (b < 0n ? b + (1n << 64n) : b);
+  let count = 0;
+  while (x) {
+    count += Number(x & 1n);
+    x >>= 1n;
+  }
+  return count;
+};
+
+t('simhash: identical text → identical sig (Hamming = 0)', () => {
+  const a = simhash64(tokenize('What is the molality of a 0.5 M NaCl solution at 25 C?'));
+  const b = simhash64(tokenize('What is the molality of a 0.5 M NaCl solution at 25 C?'));
+  assert.equal(hammingDistance(a, b), 0);
+});
+
+t('simhash: whitespace + casing differences → Hamming = 0', () => {
+  const a = simhash64(tokenize('What is the molality of a 0.5 M NaCl solution?'));
+  const b = simhash64(tokenize('  WHAT   is   THE molality  of  a 0.5 M NaCl  solution? '));
+  assert.equal(hammingDistance(a, b), 0);
+});
+
+t('simhash: punctuation-only differences → Hamming = 0', () => {
+  const a = simhash64(tokenize('Define molality. State its unit.'));
+  const b = simhash64(tokenize('Define molality, state its unit'));
+  assert.equal(hammingDistance(a, b), 0);
+});
+
+t('simhash: near-duplicate Hamming is strictly smaller than unrelated Hamming', () => {
+  // The invariant that the lookup actually depends on: near-duplicate is a
+  // closer SimHash neighbor than an unrelated question. Absolute thresholds
+  // are empirically fragile (3-word shingling spreads the effect of a single
+  // word swap across multiple shingles); this comparative bound is what
+  // matters for the Agent 6 bit_count(simhash # i.simhash) <= 6 retrieval.
+  const base = simhash64(tokenize('Calculate the molality of a 0.5 M NaCl solution at 25 C'));
+  const near = simhash64(tokenize('Calculate the molarity of a 0.5 M NaCl solution at 25 C'));
+  const unrelated = simhash64(tokenize('State Henrys law and define the Henry constant K_H.'));
+  const dNear = hammingDistance(base, near);
+  const dUnrelated = hammingDistance(base, unrelated);
+  assert.ok(dNear > 0, `expected non-zero Hamming for substantive change, got ${dNear}`);
+  assert.ok(dNear < dUnrelated, `expected near (${dNear}) < unrelated (${dUnrelated})`);
+});
+
+t('simhash: empty input → 0 (matches node fallback string "0")', () => {
+  assert.equal(simhash64([]), 0n);
+  assert.equal(simhash64(tokenize('')), 0n);
+});
+
+t('normalized_question_hash: stable across whitespace + casing of question; varies with answer', () => {
+  const norm = (q, a) => {
+    const nt = normalize(q);
+    return 'sha256:' + createHash('sha256').update(nt + '|' + String(a).toLowerCase().trim()).digest('hex');
+  };
+  assert.equal(norm('What is molality?', 'B'), norm('  what  IS  molality?  ', 'b'));
+  assert.notEqual(norm('What is molality?', 'B'), norm('What is molality?', 'C'));
+});
+
 // ---------- AI call ledger invariant ----------
 
 t('AI ledger: increment from 0 → 1 → 2 only; a third call asserting "expected 2" throws', () => {

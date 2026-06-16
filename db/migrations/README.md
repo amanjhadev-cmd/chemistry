@@ -11,7 +11,8 @@ for f in 0001_extensions.sql \
          0006_rejected_questions.sql \
          0007_audit_and_coverage.sql \
          0008_seed_cbse_chemistry_curriculum.sql \
-         0009_drive_folder_cache.sql; do
+         0009_drive_folder_cache.sql \
+         0010_extend_buckets_with_dedup_sigs.sql; do
   psql "$DATABASE_URL" -f "db/migrations/$f"
 done
 ```
@@ -29,6 +30,7 @@ done
 | `0007_audit_and_coverage.sql` | `generation_audit_log`, `error_audit`, `coverage_tracker` | `PG - Audit Log`, error workflow |
 | `0008_seed_cbse_chemistry_curriculum.sql` | 6 curriculum override rows: levels 5→1 for CBSE/Class 12/Chemistry/Solutions/MCQ/Intermediate, plus level-3 `icse_12_chemistry` for a second-board demo. After applying, `Curriculum - DB Lookup` resolves CBSE Class 12 Chemistry submissions at the most specific matching level instead of falling through to `global`. | `Curriculum - DB Lookup`, `Curriculum - Resolve` |
 | `0009_drive_folder_cache.sql` | `drive_folder_cache` — path→folder_id cache for the Drive Folder Resolver. Seeded for the v2 optimization (resolver currently walks the Drive API live; cache lets it short-circuit known path prefixes). | `Drive Folder Resolver` (v2) |
+| `0010_extend_buckets_with_dedup_sigs.sql` | Adds `normalized_question_hash`, `simhash`, `minhash_signature` columns + indexes to `review_queue` and `rejected_questions`, mirroring what was already on `questions_master`. Enables cross-bucket duplicate analytics. | `PG - Insert UPGRADE`, `PG - Insert BAD` |
 
 ## Hard invariants enforced at the DB level
 
