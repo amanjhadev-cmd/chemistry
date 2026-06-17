@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    service: qgen
+    env: ${ENV:-dev}
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: qgen-postgres
+    static_configs:
+      - targets: [postgres-exporter:9187]
+
+  # Extractor microservice exposes /healthz; add /metrics there in a follow-up.
+  # - job_name: qgen-extractor
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: [qgen-extractor:8000]

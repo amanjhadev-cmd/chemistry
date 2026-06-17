@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/output/draft.v3.json",
+  "title": "AI Call 1 draft questions output (v3) - what the generator returns",
+  "description": "Drafts come back with concept_no + concept_uuid mapped against the provided concept catalogue. The pipeline enriches with chapter_uuid/chapter_no/concept_name from the lookup after parse.",
+  "type": "object",
+  "required": ["drafts"],
+  "additionalProperties": false,
+  "properties": {
+    "drafts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "draft_question_id", "concept_no", "concept_uuid",
+          "question_text", "options", "correct_options",
+          "answer_text", "question_category", "question_mark", "bloom"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "draft_question_id":  { "type": "string", "pattern": "^draft_[A-Z0-9_]+_[0-9]{4}$" },
+          "concept_no":         { "type": "integer", "minimum": 1, "description": "Must be one of the concept_no values from the concept catalogue passed in the prompt." },
+          "concept_uuid":       { "type": "string", "description": "Echo of the matching concept_uuid - belt-and-braces; the pipeline verifies it matches concept_no." },
+          "question_text":      { "type": "string", "description": "HTML with KaTeX allowed. Wrap statements in <p>...</p>; wrap math in $...$ or $$...$$." },
+          "options":            { "type": "array", "items": { "type": "object", "required": ["option_number", "option_text"], "additionalProperties": false, "properties": { "option_number": { "type": "string" }, "option_text": { "type": "string" } } } },
+          "correct_options":    { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["option_number"], "additionalProperties": false, "properties": { "option_number": { "type": "string" } } } },
+          "answer_text":        { "type": "string", "description": "Hint or exact answer text. May be empty for pure option-based questions." },
+          "question_category":  { "type": "string", "enum": ["NUMERICAL", "THEORETICAL"] },
+          "question_mark":      { "type": "integer", "minimum": 1, "maximum": 10 },
+          "bloom": {
+            "type": "array", "minItems": 1, "maxItems": 2,
+            "items": {
+              "type": "object", "required": ["bloom_level", "bloom_priority"], "additionalProperties": false,
+              "properties": {
+                "bloom_level":    { "type": "string", "enum": ["REMEMBER", "UNDERSTAND", "APPLY", "ANALYZE", "EVALUATE", "CREATE"] },
+                "bloom_priority": { "type": "integer", "enum": [1, 2] }
+              }
+            }
+          },
+          "source_section_ids": { "type": "array", "items": { "type": "string" } },
+          "source_pages":       { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+          "question_diagram_url": { "type": "string" }
+        }
+      }
+    }
+  }
+}

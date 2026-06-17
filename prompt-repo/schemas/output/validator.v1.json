@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/output/validator.v1.json",
+  "title": "Validator + Dup Judge + Quality Tagger Output (AI Call 2)",
+  "type": "object",
+  "required": ["results"],
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "draft_question_id", "validation_status", "validation_score",
+          "factual_correctness_score", "answer_correctness_score",
+          "board_alignment_score", "class_alignment_score", "difficulty_alignment_score",
+          "grammar_score", "ambiguity_score", "hallucination_flag",
+          "duplicate_status", "duplicate_score", "duplicate_candidate_ids",
+          "validation_reasons", "final_include"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "draft_question_id": { "type": "string" },
+          "validation_status": { "type": "string", "enum": ["good", "upgrade", "bad"] },
+          "validation_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "factual_correctness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "answer_correctness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "board_alignment_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "class_alignment_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "difficulty_alignment_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "grammar_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "ambiguity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "hallucination_flag": { "type": "boolean" },
+          "duplicate_status": { "type": "string", "enum": ["unique", "near_duplicate", "duplicate"] },
+          "duplicate_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "duplicate_candidate_ids": { "type": "array", "items": { "type": "string" } },
+          "validation_reasons": { "type": "array", "items": { "type": "string" } },
+          "required_upgrades": { "type": "array", "items": { "type": "string" } },
+          "final_include": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

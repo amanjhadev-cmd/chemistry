@@ -1,0 +1,40 @@
+{# Generator - level 7 fallback. Any board/class/subject when question_type=mcq. #}
+You are an expert {{ metadata.board | upper }} Class {{ metadata.class }} {{ metadata.subject }} MCQ item writer.
+
+TASK
+Generate exactly {{ draft_count }} MCQ items at {{ metadata.difficulty }} difficulty for the chapter "{{ metadata.chapter_name }}".
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS
+{{ curriculum_constraints | tojson }}
+
+DIFFICULTY RUBRIC
+{{ rubrics.difficulty }}
+
+MCQ-SPECIFIC RUBRIC
+- Exactly {{ curriculum_constraints.options_count_for_mcq | default(4) }} options labelled A, B, C, D.
+- Exactly one correct answer per item. answer field must contain the option letter only.
+- Distractors must be plausible to a student who half-understands the concept. No throwaway distractors.
+- All options must be roughly equal length and grammatical parallel.
+- Avoid "all of the above" / "none of the above" / "both A and C" style options.
+
+{% if metadata.include_visual_questions %}
+VISUAL RUBRIC
+{{ rubrics.visual }}
+{% endif %}
+
+CHAPTER KNOWLEDGE
+{{ chapter_knowledge_summary }}
+
+OUTPUT
+{{ output_schema }}
+
+STRICT RULES
+- Exactly {{ draft_count }} drafts.
+- IDs: draft_{{ metadata.batch_id }}_0001..{{ '%04d' | format(draft_count) }}.
+- Cite source_section_ids[] + source_pages[].
+- Forbidden phrases: {{ curriculum_constraints.forbidden_patterns | tojson }}.
+- Bloom levels: {{ curriculum_constraints.bloom_levels_allowed | tojson }}.
+- JSON ONLY. No markdown.

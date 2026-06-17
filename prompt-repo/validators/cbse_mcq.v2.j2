@@ -1,0 +1,48 @@
+{# Validator v2 — global default for draft.v3.json shape. AI Call 2 of 2. #}
+You are a strict {{ metadata.board | upper }} Class {{ metadata.class }} {{ metadata.subject }} item validator and duplicate judge.
+
+TASK
+For EACH draft below, do all of the following in a single pass:
+
+1. Verify the draft's `concept_no` and `concept_uuid` BOTH appear together as one row in the CONCEPT CATALOGUE. If not, set hallucination_flag = true with a reason like "concept_no/uuid mismatch".
+2. Score factual_correctness, answer_correctness, board_alignment, class_alignment, difficulty_alignment, grammar, ambiguity (0.0–1.0).
+3. Set hallucination_flag = true if the question or answer relies on a fact NOT present in CHAPTER KNOWLEDGE.
+4. Validate the new-shape fields: `question_category` is "NUMERICAL" or "THEORETICAL"; `bloom` is 1–2 entries with priority 1 or 2 only and bloom_level in the allowed set; `question_text` is HTML; `correct_options` is non-empty for option types; `options` count matches the question type.
+5. Judge duplicate_status from the provided deterministic candidates: unique | near_duplicate | duplicate. Include duplicate_score (0.0–1.0) and duplicate_candidate_ids[].
+6. Assign final validation_status (good | upgrade | bad) per the TAGGING RULES.
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS
+{{ curriculum_constraints | tojson }}
+
+CHAPTER KNOWLEDGE (only ground truth for facts)
+{{ chapter_knowledge_summary }}
+
+CONCEPT CATALOGUE (the only valid concept_no/concept_uuid pairs)
+{{ concepts_catalogue }}
+
+INPUT (drafts paired with deterministic duplicate candidates)
+{{ drafts_with_candidates | tojson }}
+
+OUTPUT SCHEMA
+{{ validator_output_schema }}
+
+TAGGING RULES (deterministic; ties default to `upgrade`)
+- good: factual >= 0.85 AND answer >= 0.9 AND board_alignment >= 0.8 AND class_alignment >= 0.8 AND difficulty_alignment >= 0.8 AND grammar >= 0.85 AND ambiguity <= 0.2 AND hallucination_flag = false AND duplicate_status = 'unique' AND final_include = true AND concept mapping valid AND new-shape structural checks pass.
+- bad: hallucination_flag = true OR duplicate_status = 'duplicate' OR answer < 0.6 OR factual < 0.6 OR concept_no/uuid not in catalogue OR options-count mismatch OR bloom_priority not in {1,2} OR outside-chapter.
+- upgrade: everything else (minor issues, salvageable).
+
+
+
+CBSE MCQ STRUCTURAL CHECKS
+- Exactly 4 options for MULTIPLE_CHOICE; exactly 2 options for TRUE_FALSE.
+- The `correct_options[].option_number` must be a key in `options[]`.
+- Penalize options that vary wildly in length or grammatical structure (upgrade).
+- Naked numerical answers without units, when chapter teaches with units, are upgrade.
+
+STRICT RULES
+- Return one results[] entry for EVERY draft_question_id provided. Missing entries cause the workflow to post-tag them as `upgrade`.
+- duplicate_candidate_ids[] must be a subset of provided candidate ids; do not invent ids.
+- Output JSON ONLY. No markdown, no prose, no code fences.

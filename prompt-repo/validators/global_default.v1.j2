@@ -1,0 +1,37 @@
+{# Validator - global default. Used when no more specific validator template matches.
+   This is AI Call 2 of 2. Single batch validation + dedup judgment + quality tagging. #}
+You are a strict {{ metadata.board | upper }} Class {{ metadata.class }} {{ metadata.subject }} item validator and duplicate judge.
+
+TASK
+For EACH draft question below, do all of the following in a single pass:
+
+1. Score factual_correctness, answer_correctness, board_alignment, class_alignment, difficulty_alignment, grammar, ambiguity (0.0-1.0).
+2. Set hallucination_flag = true if the question or answer relies on a fact NOT present in CHAPTER KNOWLEDGE.
+3. Judge duplicate_status using the provided deterministic duplicate candidates: unique | near_duplicate | duplicate. Include duplicate_score (0.0-1.0) and duplicate_candidate_ids[] (subset of candidate IDs you considered).
+4. Assign final validation_status: good | upgrade | bad according to TAGGING RULES below.
+5. List validation_reasons[] (short bullets) and, for `upgrade`, required_upgrades[].
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS
+{{ curriculum_constraints | tojson }}
+
+CHAPTER KNOWLEDGE (the only ground truth for facts)
+{{ chapter_knowledge_summary }}
+
+INPUT (drafts paired with deterministic duplicate candidates)
+{{ drafts_with_candidates | tojson }}
+
+OUTPUT SCHEMA
+{{ validator_output_schema }}
+
+TAGGING RULES (apply deterministically; ties default to `upgrade`)
+- good: factual_correctness >= 0.85 AND answer_correctness >= 0.9 AND board_alignment >= 0.8 AND class_alignment >= 0.8 AND difficulty_alignment >= 0.8 AND grammar >= 0.85 AND ambiguity <= 0.2 AND hallucination_flag = false AND duplicate_status = 'unique' AND final_include = true
+- bad: hallucination_flag = true OR duplicate_status = 'duplicate' OR answer_correctness < 0.6 OR factual_correctness < 0.6 OR outside-chapter OR structurally invalid
+- upgrade: everything else (minor issues, no hallucination, not duplicate, salvageable with edits)
+
+STRICT RULES
+- Return one results[] entry for EVERY draft_question_id provided. Missing entries = workflow tags as `upgrade` post-hoc.
+- duplicate_candidate_ids[] must be a subset of the candidate IDs you were given. Do not invent IDs.
+- Output JSON ONLY. No markdown, no prose, no code fences.

@@ -1,0 +1,300 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R 6 0 R] /Count 4 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 10 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 1098 >>
+stream
+BT
+/F1 11 Tf
+50 760 Td
+14 TL
+(Chapter 1: Solutions) Tj
+T*
+() Tj
+T*
+(1.1 Introduction) Tj
+T*
+() Tj
+T*
+(A solution is a homogeneous mixture of two or more components. The component) Tj
+T*
+(present in the largest quantity is called the solvent. The component present in) Tj
+T*
+(smaller quantity is called the solute. A binary solution has two components: one) Tj
+T*
+(solute and one solvent.) Tj
+T*
+() Tj
+T*
+(Solutions can be classified by the physical state of the solvent into solid,) Tj
+T*
+(liquid, and gaseous solutions. The most common type in chemistry is the liquid) Tj
+T*
+(solution where the solvent is a liquid.) Tj
+T*
+() Tj
+T*
+(1.2 Types of Solutions) Tj
+T*
+() Tj
+T*
+(Definition: A saturated solution is a solution in which no more solute can) Tj
+T*
+(dissolve at a given temperature.) Tj
+T*
+() Tj
+T*
+(Definition: An unsaturated solution is a solution in which more solute can be) Tj
+T*
+(dissolved at the same temperature.) Tj
+T*
+() Tj
+T*
+(Definition: A supersaturated solution is an unstable solution containing more) Tj
+T*
+(solute than the saturation amount at the given temperature.) Tj
+ET
+
+endstream
+endobj
+8 0 obj
+<< /Length 1566 >>
+stream
+BT
+/F1 11 Tf
+50 760 Td
+14 TL
+(1.3 Expressing Concentration of Solutions) Tj
+T*
+() Tj
+T*
+(Several methods are used to express the concentration of a solution.) Tj
+T*
+() Tj
+T*
+(Definition: Mass percentage of a component in a solution is the mass of that) Tj
+T*
+(component expressed as a percentage of the total mass of the solution.) Tj
+T*
+() Tj
+T*
+(Mass percentage of A equals the mass of A divided by total mass of solution,) Tj
+T*
+(times one hundred.) Tj
+T*
+() Tj
+T*
+(Definition: Molarity \(M\) is the number of moles of solute dissolved per litre of) Tj
+T*
+(solution. It depends on temperature because volume changes with temperature.) Tj
+T*
+() Tj
+T*
+(Formula: M equals moles of solute divided by volume of solution in litres.) Tj
+T*
+() Tj
+T*
+(Definition: Molality \(m\) is the number of moles of solute per kilogram of) Tj
+T*
+(solvent. Molality is temperature-independent because mass does not change with) Tj
+T*
+(temperature.) Tj
+T*
+() Tj
+T*
+(Formula: m equals moles of solute divided by mass of solvent in kilograms.) Tj
+T*
+() Tj
+T*
+(Definition: Mole fraction of a component is the number of moles of that) Tj
+T*
+(component divided by the total number of moles of all components in the) Tj
+T*
+(solution.) Tj
+T*
+() Tj
+T*
+(Example 1.1: Calculate the molality of a solution containing 4.0 grams of NaOH) Tj
+T*
+(dissolved in 250 grams of water. Molar mass of NaOH is 40 g per mol.) Tj
+T*
+(Solution: moles of NaOH equals 4.0 divided by 40 equals 0.1 mol. Mass of solvent) Tj
+T*
+(in kg equals 0.250. Molality equals 0.1 divided by 0.250 equals 0.4 mol per kg.) Tj
+ET
+
+endstream
+endobj
+9 0 obj
+<< /Length 1370 >>
+stream
+BT
+/F1 11 Tf
+50 760 Td
+14 TL
+(1.4 Solubility) Tj
+T*
+() Tj
+T*
+(Definition: Solubility of a substance is the maximum amount that can be) Tj
+T*
+(dissolved in a specified amount of solvent at a specified temperature.) Tj
+T*
+() Tj
+T*
+(Solubility of a solid in a liquid depends on the nature of the solute and) Tj
+T*
+(solvent, on temperature, and weakly on pressure.) Tj
+T*
+() Tj
+T*
+(Henry's Law: The partial pressure of the gas in vapour phase is proportional to) Tj
+T*
+(the mole fraction of the gas in the solution. Mathematically, p equals K H) Tj
+T*
+(times x, where K H is the Henry's law constant.) Tj
+T*
+() Tj
+T*
+(Example 1.2: If N2 gas is bubbled through water at 293 K and 1 atm, calculate) Tj
+T*
+(the mole fraction of N2 in water. K H for N2 at 293 K is 76.48 kbar.) Tj
+T*
+(Solution: x equals p divided by K H equals 1 atm divided by 76.48 kbar. Converting) Tj
+T*
+(1 atm to 0.987 bar, x equals 0.987 divided by 76480 equals 1.29 times 10 to the) Tj
+T*
+(minus 5.) Tj
+T*
+() Tj
+T*
+(1.5 Vapour Pressure of Liquid Solutions) Tj
+T*
+() Tj
+T*
+(Raoult's Law for a solution of two volatile components: the partial vapour) Tj
+T*
+(pressure of each component is directly proportional to its mole fraction in the) Tj
+T*
+(solution. p1 equals p1-naught times x1, and p2 equals p2-naught times x2, where) Tj
+T*
+(p1-naught and p2-naught are vapour pressures of pure components.) Tj
+ET
+
+endstream
+endobj
+10 0 obj
+<< /Length 1778 >>
+stream
+BT
+/F1 11 Tf
+50 760 Td
+14 TL
+(1.6 Colligative Properties) Tj
+T*
+() Tj
+T*
+(Definition: Colligative properties are properties that depend only on the) Tj
+T*
+(number of solute particles, not on their nature.) Tj
+T*
+() Tj
+T*
+(The four colligative properties are: relative lowering of vapour pressure,) Tj
+T*
+(elevation of boiling point, depression of freezing point, and osmotic pressure.) Tj
+T*
+() Tj
+T*
+(Elevation of boiling point: delta T b equals K b times m, where K b is the) Tj
+T*
+(ebullioscopic constant and m is the molality of the solute.) Tj
+T*
+() Tj
+T*
+(Depression of freezing point: delta T f equals K f times m, where K f is the) Tj
+T*
+(cryoscopic constant.) Tj
+T*
+() Tj
+T*
+(Osmotic pressure: pi equals C R T, where C is the molar concentration of the) Tj
+T*
+(solute, R is the gas constant, and T is the temperature in Kelvin.) Tj
+T*
+() Tj
+T*
+(Example 1.3: 18 grams of glucose \(molar mass 180\) is dissolved in 1 kg of water.) Tj
+T*
+(Calculate the freezing point depression. K f for water is 1.86 K kg per mol.) Tj
+T*
+(Solution: molality m equals 18 divided by 180 divided by 1 equals 0.1 mol per) Tj
+T*
+(kg. Delta T f equals 1.86 times 0.1 equals 0.186 K. So the freezing point of) Tj
+T*
+(the solution is minus 0.186 degrees Celsius.) Tj
+T*
+() Tj
+T*
+(1.7 Abnormal Molar Masses) Tj
+T*
+() Tj
+T*
+(When the actual molar mass differs from the expected value, the solute is said) Tj
+T*
+(to show abnormal behaviour due to association or dissociation. The van't Hoff) Tj
+T*
+(factor i corrects for this. i equals normal molar mass divided by abnormal) Tj
+T*
+(molar mass.) Tj
+T*
+() Tj
+T*
+(For complete dissociation of an electrolyte AB into A plus and B minus, i) Tj
+T*
+(approaches 2. For dimerization of an acid like benzoic acid in benzene, i) Tj
+T*
+(approaches 0.5.) Tj
+ET
+
+endstream
+endobj
+11 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000139 00000 n 
+0000000266 00000 n 
+0000000393 00000 n 
+0000000520 00000 n 
+0000000648 00000 n 
+0000001798 00000 n 
+0000003416 00000 n 
+0000004838 00000 n 
+0000006669 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+6767
+%%EOF

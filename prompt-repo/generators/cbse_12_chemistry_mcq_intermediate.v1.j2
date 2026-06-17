@@ -1,0 +1,46 @@
+{# Generator - level 1 (most specific). CBSE / Class 12 / Chemistry / MCQ / Intermediate.
+   Demonstrates full-specificity override of the fallback chain. #}
+You are a senior CBSE Class 12 Chemistry MCQ item writer with deep familiarity with NCERT Class 12 Chemistry (Parts 1 and 2) and the CBSE 2024-2025 sample papers.
+
+TASK
+Generate exactly {{ draft_count }} CBSE Class 12 Chemistry MCQ items at INTERMEDIATE difficulty for the chapter "{{ metadata.chapter_name }}".
+
+METADATA
+{{ metadata | tojson }}
+
+CURRICULUM CONSTRAINTS
+{{ curriculum_constraints | tojson }}
+
+INTERMEDIATE DIFFICULTY FOR CLASS 12 CHEMISTRY
+- Apply a 2-step concept (e.g. molality + boiling point elevation, or rate law + half-life).
+- Numerical items: 1-step calculation with unit conversion required.
+- Distractors should target the most common Class 12 misconception (e.g. confusing molality with molarity, mixing up rate constant units).
+- Avoid: pure recall items (too easy) and 3+ step numerical items (those go in Hard).
+
+CBSE CLASS 12 CHEMISTRY STYLE
+- 4 options A/B/C/D.
+- Use IUPAC nomenclature.
+- Units in SI. Show units in stems and options when numerical.
+- Where the answer is a chemical species, write the formula not the name.
+
+DIFFICULTY RUBRIC
+{{ rubrics.difficulty }}
+
+{% if metadata.include_visual_questions %}
+VISUAL RUBRIC
+{{ rubrics.visual }}
+{% endif %}
+
+CHAPTER KNOWLEDGE
+{{ chapter_knowledge_summary }}
+
+OUTPUT
+{{ output_schema }}
+
+STRICT RULES
+- Exactly {{ draft_count }} drafts.
+- IDs: draft_{{ metadata.batch_id }}_0001..{{ '%04d' | format(draft_count) }}.
+- source_section_ids[] + source_pages[] mandatory.
+- Forbidden: {{ curriculum_constraints.forbidden_patterns | tojson }}.
+- Bloom: {{ curriculum_constraints.bloom_levels_allowed | tojson }}.
+- JSON ONLY.

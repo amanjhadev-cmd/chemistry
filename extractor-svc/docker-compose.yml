@@ -1,0 +1,23 @@
+services:
+  extractor:
+    build: .
+    image: qgen-extractor:v1
+    container_name: qgen-extractor
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      EXTRACTOR_BEARER_TOKEN: "${EXTRACTOR_BEARER_TOKEN:-}"
+      EXTRACTOR_MAX_PDF_BYTES: "52428800"
+      EXTRACTOR_ASSETS_DIR: /data/assets
+    volumes:
+      - extractor-assets:/data/assets
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/healthz\",timeout=3).status==200 else 1)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  extractor-assets:
