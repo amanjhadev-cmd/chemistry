@@ -454,6 +454,44 @@ t('normalized_question_hash: stable across whitespace + casing of question; vari
   assert.notEqual(norm('What is molality?', 'B'), norm('What is molality?', 'C'));
 });
 
+// ---------- AI cost arithmetic (mirrors Capture AI Costs node) ----------
+
+const cost = (tok_in, tok_out, model, pricing) => {
+  const p = pricing[model] || pricing['default'];
+  return Number(((tok_in / 1e6) * p.in_per_m + (tok_out / 1e6) * p.out_per_m).toFixed(6));
+};
+
+const PRICING_TEST = {
+  'claude-opus-4-7': { in_per_m: 15.0, out_per_m: 75.0 },
+  'claude-sonnet-4-6': { in_per_m: 3.0, out_per_m: 15.0 },
+  'default': { in_per_m: 15.0, out_per_m: 75.0 },
+};
+
+t('ai cost: typical batch (Opus, 8k in + 6k out per call) computes to expected $', () => {
+  const gen = cost(8000, 6000, 'claude-opus-4-7', PRICING_TEST);
+  const val = cost(8000, 6000, 'claude-opus-4-7', PRICING_TEST);
+  // 8000 tokens * $15/M = $0.12; 6000 tokens * $75/M = $0.45; per call = $0.57; batch = $1.14
+  assert.equal(gen, 0.57);
+  assert.equal(val, 0.57);
+  assert.equal(Number((gen + val).toFixed(6)), 1.14);
+});
+
+t('ai cost: zero usage → 0 (handles failed AI calls cleanly)', () => {
+  assert.equal(cost(0, 0, 'claude-opus-4-7', PRICING_TEST), 0);
+});
+
+t('ai cost: unknown model falls back to default pricing', () => {
+  const known = cost(10000, 10000, 'claude-opus-4-7', PRICING_TEST);
+  const unknown = cost(10000, 10000, 'totally-made-up-model', PRICING_TEST);
+  assert.equal(known, unknown);
+});
+
+t('ai cost: sonnet cheaper than opus for identical token mix', () => {
+  const opus = cost(10000, 10000, 'claude-opus-4-7', PRICING_TEST);
+  const sonnet = cost(10000, 10000, 'claude-sonnet-4-6', PRICING_TEST);
+  assert.ok(sonnet < opus, `sonnet (${sonnet}) should be cheaper than opus (${opus})`);
+});
+
 // ---------- AI call ledger invariant ----------
 
 t('AI ledger: increment from 0 → 1 → 2 only; a third call asserting "expected 2" throws', () => {

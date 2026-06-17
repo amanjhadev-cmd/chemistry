@@ -71,6 +71,14 @@ psql "$DATABASE_URL" -c \
    ORDER BY last_updated DESC LIMIT 10;"
 
 echo
+echo "AI cost for this batch (placeholder pricing — verify before billing use):"
+psql "$DATABASE_URL" -c \
+  "SELECT generator_model, generator_input_tokens AS gen_in, generator_output_tokens AS gen_out, generator_cost_usd AS gen_usd,
+          validator_input_tokens AS val_in, validator_output_tokens AS val_out, validator_cost_usd AS val_usd,
+          total_cost_usd, pricing_version, good_count, draft_count
+   FROM cost_per_batch WHERE batch_id = '${BATCH}';"
+
+echo
 echo "Curriculum + prompt provenance from the audit body:"
 psql "$DATABASE_URL" -c \
   "SELECT audit->>'prompt_template_id' AS prompt_id,
