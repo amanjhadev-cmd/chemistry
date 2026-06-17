@@ -1,0 +1,91 @@
+groups:
+  - name: qgen_budget
+    interval: 1m
+    rules:
+      - alert: QgenAiCallBudgetLeak
+        expr: qgen_ai_call_budget_divergence > 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI call budget invariant violated (divergence={{ $value }})"
+          description: |
+            Sum of expected AI charging events minus actual is > 0 for 10 minutes.
+            Either a batch ran with extra AI calls, or cost capture failed.
+            Investigate generation_audit_log + cost_per_batch for the latest batches.
+
+      - alert: QgenDailyCostHigh
+        expr: qgen_ai_cost_usd_last_24h_usd > 100
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "24h spend ${{ $value }} > $100"
+          description: |
+            Compare to daily_cost_rollup view. Check top_cost_batches for the
+            offending batches (often a prompt regression inflating draft_count).
+
+  - name: qgen_quality
+    interval: 5m
+    rules:
+      - alert: QgenGoodRatioLow
+        expr: qgen_good_ratio_last_24h_ratio < 0.30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "good_ratio < 30% for 1h (currently {{ $value | humanizePercentage }})"
+          description: |
+            Likely prompt regression. Inspect recent prompt_template_resolved_key
+            distribution and validation_reasons in review_queue.
+
+      - alert: QgenShortfallRateHigh
+        expr: qgen_shortfall_batches_last_24h_total > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} batches shorted in the last 24h"
+          description: |
+            Bump overgeneration_factor in Agent 1 if this is sustained.
+
+  - name: qgen_errors
+    interval: 1m
+    rules:
+      - alert: QgenErrorRateHigh
+        expr: qgen_error_audit_last_1h_total > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} unhandled errors in the last 1h"
+          description: |
+            Check error_audit table for the failing nodes + messages.
+
+  - name: qgen_dedup
+    interval: 5m
+    rules:
+      - alert: QgenSimhashNotPopulated
+        expr: qgen_dedup_signals_populated_pct_simhash_pct < 95
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Only {{ $value }}% of questions_master rows have simhash"
+          description: |
+            Compute Dedup Signatures node may have broken or migration 0010
+            not yet applied to historical rows.
+
+  - name: qgen_coverage
+    interval: 1h
+    rules:
+      - alert: QgenCoverageGapsGrowing
+        expr: increase(qgen_coverage_gaps_total_total[24h]) > 10
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $value }} new coverage gaps in 24h"
+          description: |
+            More syllabus cells with <5 good questions. Check coverage_gaps view
+            and queue backfill batches for the sparse cells.

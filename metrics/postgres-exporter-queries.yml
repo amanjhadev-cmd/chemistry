@@ -1,0 +1,291 @@
+# Custom Prometheus metrics for Question Generation v1.0.
+#
+# Drop into postgres_exporter via --extend.query-path=postgres-exporter-queries.yml
+# (or PG_EXPORTER_EXTEND_QUERY_PATH env). Every entry below becomes a metric
+# series with the labels declared in `metrics:`.
+#
+# Naming: qgen_<subject>_<unit> with snake_case names per Prometheus convention.
+
+# ---- Batch volume + outcome ----
+
+qgen_batches:
+  query: |
+    SELECT
+      stage::text   AS stage,
+      status::text  AS status,
+      count(*)::bigint AS total
+    FROM generation_audit_log
+    GROUP BY stage, status
+  metrics:
+    - stage:
+        usage: "LABEL"
+        description: "Pipeline stage (complete / error / agent name)"
+    - status:
+        usage: "LABEL"
+        description: "Stage status (success / fail)"
+    - total:
+        usage: "COUNTER"
+        description: "Total rows in generation_audit_log"
+
+qgen_batches_last_24h:
+  query: |
+    SELECT
+      stage::text   AS stage,
+      status::text  AS status,
+      count(*)::bigint AS total
+    FROM generation_audit_log
+    WHERE created_at > now() - interval '24 hours'
+    GROUP BY stage, status
+  metrics:
+    - stage:
+        usage: "LABEL"
+        description: "Pipeline stage"
+    - status:
+        usage: "LABEL"
+        description: "Stage status"
+    - total:
+        usage: "GAUGE"
+        description: "Audit log rows in the last 24 hours"
+
+# ---- Bucket counts (good / upgrade / bad) ----
+
+qgen_questions_bucket:
+  query: |
+    SELECT 'good'::text AS bucket, count(*)::bigint AS total FROM questions_master
+    UNION ALL
+    SELECT 'upgrade', count(*) FROM review_queue
+    UNION ALL
+    SELECT 'bad', count(*) FROM rejected_questions
+  metrics:
+    - bucket:
+        usage: "LABEL"
+        description: "Validation bucket"
+    - total:
+        usage: "COUNTER"
+        description: "Total questions persisted, by bucket"
+
+qgen_questions_bucket_last_24h:
+  query: |
+    SELECT 'good'::text AS bucket, count(*)::bigint AS total
+      FROM questions_master WHERE created_at > now() - interval '24 hours'
+    UNION ALL
+    SELECT 'upgrade', count(*) FROM review_queue       WHERE created_at > now() - interval '24 hours'
+    UNION ALL
+    SELECT 'bad',     count(*) FROM rejected_questions WHERE created_at > now() - interval '24 hours'
+  metrics:
+    - bucket:
+        usage: "LABEL"
+        description: "Validation bucket"
+    - total:
+        usage: "GAUGE"
+        description: "Questions inserted in the last 24h, by bucket"
+
+# ---- AI cost + token usage ----
+
+qgen_ai_tokens_total:
+  query: |
+    SELECT
+      'generator'::text AS ordinal,
+      'input'::text     AS direction,
+      coalesce(sum(generator_input_tokens), 0)::bigint AS total
+    FROM cost_per_batch
+    UNION ALL
+    SELECT 'generator', 'output', coalesce(sum(generator_output_tokens), 0) FROM cost_per_batch
+    UNION ALL
+    SELECT 'validator', 'input',  coalesce(sum(validator_input_tokens), 0)  FROM cost_per_batch
+    UNION ALL
+    SELECT 'validator', 'output', coalesce(sum(validator_output_tokens), 0) FROM cost_per_batch
+  metrics:
+    - ordinal:
+        usage: "LABEL"
+        description: "Which AI call (generator = call 1, validator = call 2)"
+    - direction:
+        usage: "LABEL"
+        description: "input or output tokens"
+    - total:
+        usage: "COUNTER"
+        description: "Total Anthropic tokens consumed"
+
+qgen_ai_cost_usd_total:
+  query: |
+    SELECT
+      coalesce(generator_model, 'unknown')::text AS model,
+      coalesce(sum(generator_cost_usd), 0)::numeric AS total
+    FROM cost_per_batch
+    GROUP BY generator_model
+    UNION ALL
+    SELECT
+      coalesce(validator_model, 'unknown')::text AS model,
+      coalesce(sum(validator_cost_usd), 0)::numeric AS total
+    FROM cost_per_batch
+    GROUP BY validator_model
+  metrics:
+    - model:
+        usage: "LABEL"
+        description: "Anthropic model id"
+    - total:
+        usage: "COUNTER"
+        description: "Cumulative USD spend, by model (placeholder pricing — see docs/cost-tracking.md)"
+
+qgen_ai_cost_usd_last_24h:
+  query: |
+    SELECT
+      coalesce(sum(total_cost_usd), 0)::numeric AS usd,
+      coalesce(sum(total_input_tokens + total_output_tokens), 0)::bigint AS tokens,
+      count(*)::bigint AS batches
+    FROM cost_per_batch
+    WHERE created_at > now() - interval '24 hours'
+  metrics:
+    - usd:
+        usage: "GAUGE"
+        description: "Total USD spend in the last 24 hours"
+    - tokens:
+        usage: "GAUGE"
+        description: "Total tokens in the last 24 hours"
+    - batches:
+        usage: "GAUGE"
+        description: "Total batches in the last 24 hours"
+
+# ---- AI call ledger invariant ----
+# Total AI calls must equal 2 × batch count. This metric is the divergence:
+# successful_batches × 2 - actual_token_charging_events. Non-zero = budget leak.
+
+qgen_ai_call_budget_divergence:
+  query: |
+    SELECT
+      ((SELECT count(*)::bigint FROM cost_per_batch) * 2)
+      - (
+          (SELECT count(*)::bigint FROM cost_per_batch WHERE generator_input_tokens > 0)
+          + (SELECT count(*)::bigint FROM cost_per_batch WHERE validator_input_tokens > 0)
+        ) AS divergence
+  metrics:
+    - divergence:
+        usage: "GAUGE"
+        description: "Sum: expected AI charging events - actual. Must be 0 (allows transient lag during a run). Non-zero sustained = budget leak."
+
+# ---- Shortfall + good-ratio ----
+
+qgen_shortfall_batches_last_24h:
+  query: |
+    SELECT count(*)::bigint AS total
+    FROM cost_per_batch
+    WHERE shortfall = true AND created_at > now() - interval '24 hours'
+  metrics:
+    - total:
+        usage: "GAUGE"
+        description: "Batches that returned fewer good questions than requested in the last 24h"
+
+qgen_good_ratio_last_24h:
+  query: |
+    SELECT
+      coalesce(
+        sum(good_count)::numeric
+        / NULLIF(sum(good_count + upgrade_count + bad_count), 0),
+        0
+      ) AS ratio
+    FROM cost_per_batch
+    WHERE created_at > now() - interval '24 hours'
+  metrics:
+    - ratio:
+        usage: "GAUGE"
+        description: "Good / (good+upgrade+bad) across all questions produced in the last 24h. <0.3 = prompt regression suspected."
+
+# ---- Errors ----
+
+qgen_error_audit_total:
+  query: |
+    SELECT
+      coalesce(error_code, 'UNKNOWN')::text AS error_code,
+      count(*)::bigint AS total
+    FROM error_audit
+    GROUP BY error_code
+  metrics:
+    - error_code:
+        usage: "LABEL"
+        description: "Error class from execution.error.name|type|code"
+    - total:
+        usage: "COUNTER"
+        description: "Errors caught by the error sub-workflow, by class"
+
+qgen_error_audit_last_1h:
+  query: |
+    SELECT count(*)::bigint AS total
+    FROM error_audit
+    WHERE created_at > now() - interval '1 hour'
+  metrics:
+    - total:
+        usage: "GAUGE"
+        description: "Error sub-workflow trigger count in the last 1h"
+
+# ---- KB cache hit rate (approximate, from row counts) ----
+
+qgen_kb_cache:
+  query: |
+    SELECT
+      count(*)::bigint AS rows,
+      coalesce(avg(extraction_quality), 0)::numeric AS avg_quality
+    FROM kb_cache
+  metrics:
+    - rows:
+        usage: "GAUGE"
+        description: "Distinct (pdf_hash, extractor_version) entries cached"
+    - avg_quality:
+        usage: "GAUGE"
+        description: "Mean extraction_quality across cached KB rows"
+
+# ---- Coverage gaps (sparse cells in the syllabus grid) ----
+
+qgen_coverage_gaps_total:
+  query: |
+    SELECT count(*)::bigint AS total
+    FROM coverage_gaps
+  metrics:
+    - total:
+        usage: "GAUGE"
+        description: "Distinct (board,class,subject,chapter,topic,subtopic,qtype,difficulty) cells with good_count < 5"
+
+qgen_coverage_total_questions:
+  query: |
+    SELECT
+      board::text AS board,
+      coalesce(sum(good_count), 0)::bigint AS good,
+      coalesce(sum(upgrade_count), 0)::bigint AS upgrade,
+      coalesce(sum(bad_count), 0)::bigint AS bad
+    FROM coverage_tracker
+    GROUP BY board
+  metrics:
+    - board:
+        usage: "LABEL"
+        description: "Board (cbse / icse / igcse / ...)"
+    - good:
+        usage: "GAUGE"
+        description: "Questions persisted as good, by board"
+    - upgrade:
+        usage: "GAUGE"
+        description: "Questions held for review, by board"
+    - bad:
+        usage: "GAUGE"
+        description: "Questions rejected, by board"
+
+# ---- Dedup health ----
+
+qgen_dedup_signals_populated_pct:
+  query: |
+    SELECT
+      (count(*) FILTER (WHERE simhash IS NOT NULL)::numeric
+       / NULLIF(count(*)::numeric, 0) * 100) AS simhash_pct,
+      (count(*) FILTER (WHERE normalized_question_hash IS NOT NULL)::numeric
+       / NULLIF(count(*)::numeric, 0) * 100) AS norm_hash_pct,
+      (count(*) FILTER (WHERE minhash_signature IS NOT NULL)::numeric
+       / NULLIF(count(*)::numeric, 0) * 100) AS minhash_pct
+    FROM questions_master
+  metrics:
+    - simhash_pct:
+        usage: "GAUGE"
+        description: "Pct of approved questions with non-null simhash. Should approach 100 after #13."
+    - norm_hash_pct:
+        usage: "GAUGE"
+        description: "Pct with non-null normalized_question_hash. Should approach 100 after #13."
+    - minhash_pct:
+        usage: "GAUGE"
+        description: "Pct with non-null minhash_signature. Should approach 100 after #13."

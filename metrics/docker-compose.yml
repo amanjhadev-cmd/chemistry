@@ -1,0 +1,56 @@
+# Postgres-exporter + Prometheus + Grafana stack for Question Generation v1.0.
+#
+# Run alongside (not inside) the n8n container:
+#   cd metrics && docker compose up -d
+#
+# Then point Prometheus at the master DB. Grafana auto-imports the dashboard.
+
+services:
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: qgen-pg-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "${DATABASE_URL:?Set DATABASE_URL (postgres://user:pass@host:5432/db?sslmode=disable)}"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yml
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+    volumes:
+      - ./postgres-exporter-queries.yml:/etc/postgres-exporter/queries.yml:ro
+    ports:
+      - "9187:9187"
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: qgen-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    depends_on:
+      - postgres-exporter
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: qgen-grafana
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
