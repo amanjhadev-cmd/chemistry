@@ -1,7 +1,8 @@
 {
-  "manifest_version": "v1",
-  "updated_at": "2026-06-15",
-  "active_prompt_repo_version": "v1",
+  "manifest_version": "v2",
+  "updated_at": "2026-06-16",
+  "active_prompt_repo_version": "v2",
+  "schema_set": "v3",
   "fallback_order": [
     "{board}_{class}_{subject}_{question_type}_{difficulty}",
     "{board}_{class}_{subject}_{question_type}",
@@ -13,24 +14,24 @@
     "global_default"
   ],
   "generators": {
-    "cbse_12_chemistry_mcq_intermediate": {
-      "id": "cbse_12_chemistry_mcq_intermediate",
-      "version": "v1",
+    "cbse_12_chemistry_mcq_medium": {
+      "id": "cbse_12_chemistry_mcq_medium",
+      "version": "v2",
       "active": true,
-      "path": "generators/cbse_12_chemistry_mcq_intermediate.v1.j2",
-      "output_schema": "schemas/output/mcq.v2.json",
+      "path": "generators/cbse_12_chemistry_mcq_medium.v2.j2",
+      "output_schema": "schemas/output/draft.v3.json",
       "rubrics": {
-        "difficulty": "rubrics/difficulty/intermediate.v1.md",
+        "difficulty": "rubrics/difficulty/medium.v1.md",
         "question_type": "rubrics/question_type/mcq.v1.md",
         "visual": "rubrics/visual/general.v1.md"
       }
     },
     "cbse_mcq": {
       "id": "cbse_mcq",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "generators/cbse_mcq.v1.j2",
-      "output_schema": "schemas/output/mcq.v2.json",
+      "path": "generators/cbse_mcq.v2.j2",
+      "output_schema": "schemas/output/draft.v3.json",
       "rubrics": {
         "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
         "question_type": "rubrics/question_type/mcq.v1.md",
@@ -39,10 +40,10 @@
     },
     "global_mcq": {
       "id": "global_mcq",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "generators/global_mcq.v1.j2",
-      "output_schema": "schemas/output/mcq.v2.json",
+      "path": "generators/global_mcq.v2.j2",
+      "output_schema": "schemas/output/draft.v3.json",
       "rubrics": {
         "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
         "question_type": "rubrics/question_type/mcq.v1.md",
@@ -51,10 +52,10 @@
     },
     "global_default": {
       "id": "global_default",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "generators/global_default.v1.j2",
-      "output_schema": "schemas/output/mcq.v2.json",
+      "path": "generators/global_default.v2.j2",
+      "output_schema": "schemas/output/draft.v3.json",
       "rubrics": {
         "difficulty": "rubrics/difficulty/{difficulty}.v1.md",
         "question_type": "rubrics/question_type/{question_type}.v1.md",
@@ -65,30 +66,42 @@
   "validators": {
     "cbse_mcq": {
       "id": "cbse_mcq",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "validators/cbse_mcq.v1.j2",
+      "path": "validators/cbse_mcq.v2.j2",
       "output_schema": "schemas/output/validator.v1.json"
     },
     "global_mcq": {
       "id": "global_mcq",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "validators/global_mcq.v1.j2",
+      "path": "validators/global_mcq.v2.j2",
       "output_schema": "schemas/output/validator.v1.json"
     },
     "global_default": {
       "id": "global_default",
-      "version": "v1",
+      "version": "v2",
       "active": true,
-      "path": "validators/global_default.v1.j2",
+      "path": "validators/global_default.v2.j2",
       "output_schema": "schemas/output/validator.v1.json"
     }
   },
   "output_schemas": {
-    "mcq": { "version": "v2", "path": "schemas/output/mcq.v2.json" },
-    "la":  { "version": "v1", "path": "schemas/output/la.v1.json" },
-    "validator": { "version": "v1", "path": "schemas/output/validator.v1.json" }
+    "mcq":      { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "draft":    { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "question": { "version": "v3", "path": "schemas/output/question.v3.json" },
+    "validator":{ "version": "v1", "path": "schemas/output/validator.v1.json" },
+    "true_false":          { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "multiple_choice":     { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "assertion_reasoning": { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "fill_in_the_blank":   { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "very_short_answer":   { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "short_answer":        { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "long_answer":         { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "case_study":          { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "match_columns":       { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "subpart_based":       { "version": "v3", "path": "schemas/output/draft.v3.json" },
+    "multi_statement_mcq": { "version": "v3", "path": "schemas/output/draft.v3.json" }
   },
   "contracts": {
     "metadata": "schemas/contracts/metadata.schema.json",

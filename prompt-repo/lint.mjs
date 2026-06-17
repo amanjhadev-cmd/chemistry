@@ -71,6 +71,7 @@ const ALLOWED_VARS = new Set([
   'chapter_knowledge_summary', 'output_schema', 'validator_output_schema',
   'draft_count', 'requested_count', 'drafts_with_candidates',
   'rubrics', 'rubrics.difficulty', 'rubrics.question_type', 'rubrics.visual',
+  'concepts_catalogue',
 ]);
 
 // ---------- Mini render engine (copy of workflow's logic) ----------

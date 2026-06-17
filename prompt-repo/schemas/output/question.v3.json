@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prompt-repo/schemas/output/question.v3.json",
+  "title": "Approved question output (v3) - one file per question",
+  "description": "Shape of a single approved question's JSON file under QuestionBank/.../{batch_id}/questions/QN.json. Mirrors the platform schema.",
+  "type": "object",
+  "required": ["metadata", "question"],
+  "additionalProperties": false,
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "board", "category_choices", "chapter_name", "chapter_no", "chapter_uuid",
+        "concept_name", "concept_no", "concept_uuid",
+        "question_level", "question_type", "question_category",
+        "standard", "subject_code", "subject_name",
+        "question_mark", "bloom", "generation_version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "board":            { "type": "string" },
+        "category_choices": { "type": "string", "examples": ["K-12", "Competitive"] },
+        "chapter_name":     { "type": "string" },
+        "chapter_no":       { "type": "integer", "minimum": 1 },
+        "chapter_uuid":     { "type": "string" },
+        "concept_name":     { "type": "string" },
+        "concept_no":       { "type": "integer", "minimum": 1 },
+        "concept_uuid":     { "type": "string" },
+        "question_level":   { "type": "string", "enum": ["LEVEL_EASY", "LEVEL_MEDIUM", "LEVEL_HARD"] },
+        "question_type": {
+          "type": "string",
+          "enum": [
+            "MULTIPLE_CHOICE",
+            "ASSERTION_REASONING",
+            "MULTI_STATEMENT_MCQ",
+            "VERY_SHORT_ANSWER",
+            "SHORT_ANSWER",
+            "FILL_IN_THE_BLANK",
+            "TRUE_FALSE",
+            "LONG_ANSWER",
+            "CASE_STUDY",
+            "MATCH_COLUMNS",
+            "SUBPART_BASED"
+          ]
+        },
+        "question_category": {
+          "type": "string",
+          "enum": ["NUMERICAL", "THEORETICAL", ""]
+        },
+        "standard":           { "type": "string", "examples": ["10th", "12th"] },
+        "subject_code":       { "type": "string", "examples": ["MATHS", "CHEM", "PHYSICS"] },
+        "subject_name":       { "type": "string" },
+        "question_mark":      { "type": "integer", "minimum": 1, "maximum": 10 },
+        "bloom": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["bloom_level", "bloom_priority"],
+            "additionalProperties": false,
+            "properties": {
+              "bloom_level":    { "type": "string", "enum": ["REMEMBER", "UNDERSTAND", "APPLY", "ANALYZE", "EVALUATE", "CREATE"] },
+              "bloom_priority": { "type": "integer", "enum": [1, 2] }
+            }
+          }
+        },
+        "generation_version": { "type": "string", "examples": ["v2", "v3"] }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": ["final_answer", "options", "question_no", "question_text", "question_diagram_url"],
+      "additionalProperties": false,
+      "properties": {
+        "final_answer": {
+          "type": "object",
+          "required": ["correct_options", "answer_text"],
+          "additionalProperties": false,
+          "properties": {
+            "correct_options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["option_number"],
+                "additionalProperties": false,
+                "properties": {
+                  "option_number": { "type": "string", "examples": ["A", "B", "C", "D"] }
+                }
+              }
+            },
+            "answer_text": { "type": "string", "description": "Hint or exact answer text. HTML with KaTeX allowed." }
+          }
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["option_number", "option_text"],
+            "additionalProperties": false,
+            "properties": {
+              "option_number": { "type": "string" },
+              "option_text":   { "type": "string", "description": "HTML with KaTeX allowed." }
+            }
+          }
+        },
+        "question_no":          { "type": "integer", "minimum": 1, "description": "Sequence number within the batch (1..N)." },
+        "question_text":        { "type": "string", "description": "HTML with KaTeX allowed." },
+        "question_diagram_url": { "type": "string", "description": "Drive/S3 URL of an attached diagram asset, or empty string." }
+      }
+    }
+  }
+}
