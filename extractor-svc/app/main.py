@@ -129,6 +129,22 @@ async def extract(
     if pdf_bytes[:5] != b"%PDF-":
         raise HTTPException(status_code=400, detail="body is not a valid PDF (missing %PDF- header)")
 
+    # Encrypted-PDF guard. PyMuPDF can tell us cheaply before the pipeline runs.
+    try:
+        import fitz  # PyMuPDF
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as _probe:
+            if _probe.is_encrypted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="encrypted PDFs are not supported; remove the password and resubmit",
+                )
+    except HTTPException:
+        raise
+    except Exception:
+        # Probe failure shouldn't block extraction — the main pipeline will
+        # surface a clearer error if the PDF is truly malformed.
+        pass
+
     # Compute or verify hash.
     computed = "sha256:" + hashlib.sha256(pdf_bytes).hexdigest()
     if x_pdf_hash and x_pdf_hash != computed:
